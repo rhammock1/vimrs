@@ -1,12 +1,16 @@
 use std::io;
-use std::io::Read;
 use std::time::Duration;
-use crossterm::{event, terminal};
+use crossterm::{cursor, event, execute, terminal};
 use crossterm::event::{Event, KeyCode, KeyEvent};
 use colored::*;
 
 const POLL_TIMEOUT: Duration = Duration::from_millis(1500);
 
+/*  
+
+    CLEAN UP STRUCTURE
+
+*/
 pub struct CleanUp;
 
 impl Drop for CleanUp {
@@ -17,6 +21,11 @@ impl Drop for CleanUp {
   }
 }
 
+/*  
+
+    READER STRUCTURE
+
+*/
 pub struct Reader;
 
 impl Reader {
@@ -31,18 +40,50 @@ impl Reader {
   }
 }
 
+/*  
+
+    OUTPUT STRUCTURE
+
+*/
+struct Output;
+
+impl Output {
+  fn new() -> Self {
+    Self
+  }
+
+  fn clear_screen() -> crossterm::Result<()> {
+    execute!(io::stdout(), terminal::Clear(terminal::ClearType::All))?;
+    execute!(io::stdout(), cursor::MoveTo(0, 0))
+  }
+
+  fn refresh_screen(&self) -> crossterm::Result<()> {
+    Self::clear_screen()
+  }
+}
+
+/*  
+
+    EDITOR STRUCTURE
+
+*/
 pub struct Editor {
   reader: Reader,
+  output: Output,
 }
 
 impl Editor {
   pub fn new() -> crossterm::Result<Self> {
     // Enable terminal's raw mode
     terminal::enable_raw_mode()?;  
-    Ok(Self { reader: Reader })
+    Ok(Self {
+      reader: Reader,
+      output: Output::new(),
+    })
   }
 
   pub fn run(&self) -> crossterm::Result<bool> {
+    self.output.refresh_screen()?;
     self.process_keypress()
   }
 
