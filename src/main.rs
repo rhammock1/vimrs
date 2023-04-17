@@ -5,7 +5,7 @@ fn main() -> crossterm::Result<()> {
   let _clean_up = CleanUp;
   
   // Create a new editor
-  let editor = Editor::new()?;
+  let mut editor = Editor::new()?;
   while editor.run()? {}
 
   Ok(())

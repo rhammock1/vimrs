@@ -1,9 +1,9 @@
 use std::io;
 use std::io::Write;
 use std::time::Duration;
-use crossterm::{cursor, event, execute, terminal};
+use crossterm::{cursor, event, execute, terminal, queue};
 use crossterm::event::{Event, KeyCode, KeyEvent};
-use colored::*;
+use colored::Colorize;
 
 const POLL_TIMEOUT: Duration = Duration::from_millis(1500);
 
@@ -49,6 +49,7 @@ impl Reader {
 */
 struct Output {
   window_size: (usize, usize),
+  editor_contents: EditorContents,
 }
 
 impl Output {
@@ -56,7 +57,10 @@ impl Output {
     let window_size = terminal::size()
       .map(|(x, y)| (x as usize, y as usize))
       .unwrap();
-    Self { window_size }
+    Self {
+      window_size,
+      editor_contents: EditorContents::new(),
+    }
   }
 
   fn clear_screen() -> crossterm::Result<()> {
@@ -64,23 +68,32 @@ impl Output {
     execute!(io::stdout(), cursor::MoveTo(0, 0))
   }
 
-  fn refresh_screen(&self) -> crossterm::Result<()> {
-    Self::clear_screen()?;
+  fn refresh_screen(&mut self) -> crossterm::Result<()> {
+    queue!(
+      self.editor_contents,
+      cursor::Hide,
+      terminal::Clear(terminal::ClearType::All),
+      cursor::MoveTo(0, 0),
+    )?;
 
     self.draw_rows();
 
-    execute!(io::stdout(), cursor::MoveTo(1, 0))
+    queue!(
+      self.editor_contents,
+      cursor::MoveTo(1, 0),
+      cursor::Show,
+    )?;
+    self.editor_contents.flush()
   }
 
-  fn draw_rows(&self) {
+  fn draw_rows(&mut self) {
     let screen_rows = self.window_size.1;
     for i in 0..screen_rows {
       // Should line numbers be drawn here?
-      print!("{}", "~".purple());
+      self.editor_contents.push('~');
       if i < screen_rows - 1 {
-        println!("\r");
+        self.editor_contents.push_str("\r\n");
       }
-      io::stdout().flush().unwrap();
     }
   }
 }
@@ -105,7 +118,7 @@ impl Editor {
     })
   }
 
-  pub fn run(&self) -> crossterm::Result<bool> {
+  pub fn run(&mut self) -> crossterm::Result<bool> {
     self.output.refresh_screen()?;
     self.process_keypress()
   }
@@ -120,5 +133,55 @@ impl Editor {
       _ => {},
     }
     Ok(true)
+  }
+}
+
+/*  
+
+    Editor Contents Structure
+
+*/
+struct EditorContents {
+  content: String,
+}
+
+impl EditorContents {
+  fn new() -> Self {
+    Self {
+      content: String::new(),
+    }
+  }
+
+  fn push(&mut self, ch: char) {
+    self.content.push(ch)
+  }
+
+  fn push_str(&mut self, string: &str) {
+    self.content.push_str(string)
+  }
+}
+
+impl io::Write for EditorContents {
+  fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    match std::str::from_utf8(buf) {
+      Ok(s) => {
+        self.content.push_str(s);
+        Ok(s.len())
+      },
+      Err(_) => Err(io::ErrorKind::WriteZero.into()),
+    }
+  }
+
+  fn flush(&mut self) -> io::Result<()> {
+    let content;
+    if self.content.contains("~\r\n~\r\n") {
+      content = self.content.purple();
+    } else {
+      content = self.content.normal();
+    }
+    let out = write!(io::stdout(), "{}", content);
+    io::stdout().flush()?;
+    self.content.clear();
+    out
   }
 }
