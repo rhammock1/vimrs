@@ -18,6 +18,7 @@ impl Drop for CleanUp {
   // this function automatically runs
   fn drop(&mut self) {
     terminal::disable_raw_mode().expect("Failed to disable RAW mode.");
+    Output::clear_screen().expect("Failed to clear screen.");
   }
 }
 
