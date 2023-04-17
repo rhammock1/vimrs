@@ -58,6 +58,7 @@ impl Reader {
 struct Output {
   window_size: (usize, usize),
   editor_contents: EditorContents,
+  cursor_position: (usize, usize),
 }
 
 impl Output {
@@ -68,6 +69,7 @@ impl Output {
     Self {
       window_size,
       editor_contents: EditorContents::new(),
+      cursor_position: (0, 0),
     }
   }
 
@@ -88,7 +90,7 @@ impl Output {
 
     queue!(
       self.editor_contents,
-      cursor::MoveTo(1, 0),
+      cursor::MoveTo(self.cursor_position.0 as u16, self.cursor_position.1 as u16),
       cursor::Show,
     )?;
     self.editor_contents.flush()
@@ -136,6 +138,30 @@ impl Output {
       }
     }
   }
+
+  fn move_cursor(&mut self, direction: KeyCode) {
+    match direction {
+      KeyCode::Up => {
+        self.cursor_position.1 = self.cursor_position.1.saturating_sub(1);
+      }
+      KeyCode::Down => {
+        if self.cursor_position.1 != self.window_size.1 - 1 {
+          self.cursor_position.1 += 1;
+        }
+      }
+      KeyCode::Left => {
+        if self.cursor_position.0 != 0 {
+          self.cursor_position.0 -= 1;
+        }
+      }
+      KeyCode::Right => {
+        if self.cursor_position.0 != self.window_size.0 - 1 {
+          self.cursor_position.0 += 1;
+        }
+      }
+      _ => unimplemented!("Invalid keypress"),
+    }
+  }
 }
 
 /*  
@@ -163,13 +189,18 @@ impl Editor {
     self.process_keypress()
   }
 
-  fn process_keypress(&self) -> crossterm::Result<bool> {
+  fn process_keypress(&mut self) -> crossterm::Result<bool> {
     match self.reader.read()? {
       KeyEvent {
         code: KeyCode::Char('q'),
         modifiers: event::KeyModifiers::CONTROL,
         ..
       } => return Ok(false),
+      KeyEvent {
+        code: direction @ (KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right),
+        modifiers: event::KeyModifiers::NONE,
+        ..
+      } => self.output.move_cursor(direction),
       _ => {},
     }
     Ok(true)
