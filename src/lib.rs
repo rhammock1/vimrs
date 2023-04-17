@@ -1,4 +1,5 @@
 use std::io;
+use std::io::Write;
 use std::time::Duration;
 use crossterm::{cursor, event, execute, terminal};
 use crossterm::event::{Event, KeyCode, KeyEvent};
@@ -46,11 +47,16 @@ impl Reader {
     OUTPUT STRUCTURE
 
 */
-struct Output;
+struct Output {
+  window_size: (usize, usize),
+}
 
 impl Output {
   fn new() -> Self {
-    Self
+    let window_size = terminal::size()
+      .map(|(x, y)| (x as usize, y as usize))
+      .unwrap();
+    Self { window_size }
   }
 
   fn clear_screen() -> crossterm::Result<()> {
@@ -59,7 +65,23 @@ impl Output {
   }
 
   fn refresh_screen(&self) -> crossterm::Result<()> {
-    Self::clear_screen()
+    Self::clear_screen()?;
+
+    self.draw_rows();
+
+    execute!(io::stdout(), cursor::MoveTo(1, 0))
+  }
+
+  fn draw_rows(&self) {
+    let screen_rows = self.window_size.1;
+    for i in 0..screen_rows {
+      // Should line numbers be drawn here?
+      print!("{}", "~".purple());
+      if i < screen_rows - 1 {
+        println!("\r");
+      }
+      io::stdout().flush().unwrap();
+    }
   }
 }
 
