@@ -36,8 +36,10 @@ pub struct Editor {
 }
 
 impl Editor {
-  pub fn new() -> Self {
-    Self { reader: Reader }
+  pub fn new() -> crossterm::Result<Self> {
+    // Enable terminal's raw mode
+    terminal::enable_raw_mode()?;  
+    Ok(Self { reader: Reader })
   }
 
   pub fn run(&self) -> crossterm::Result<bool> {
