@@ -3,9 +3,17 @@ use std::io::Write;
 use std::time::Duration;
 use crossterm::{cursor, event, execute, terminal, queue};
 use crossterm::event::{Event, KeyCode, KeyEvent};
-use colored::Colorize;
+use colored::{Colorize, ColoredString};
 
-const POLL_TIMEOUT: Duration = Duration::from_millis(1500);
+struct Config {
+  version: f32,
+  poll_timeout: Duration,
+}
+
+const CONFIG: Config = Config {
+  version: 0.10,
+  poll_timeout: Duration::from_millis(1500),
+};
 
 /*  
 
@@ -33,7 +41,7 @@ pub struct Reader;
 impl Reader {
   fn read(&self) -> crossterm::Result<KeyEvent> {
     loop {
-      if event::poll(POLL_TIMEOUT)? {
+      if event::poll(CONFIG.poll_timeout)? {
         if let Event::Key(event) = event::read()? {
           return Ok(event);
         }
@@ -72,6 +80,7 @@ impl Output {
     queue!(
       self.editor_contents,
       cursor::Hide,
+      terminal::Clear(terminal::ClearType::All),
       cursor::MoveTo(0, 0),
     )?;
 
@@ -86,9 +95,38 @@ impl Output {
   }
 
   fn draw_rows(&mut self) {
+    let screen_columns = self.window_size.0;
     let screen_rows = self.window_size.1;
+
     for i in 0..screen_rows {
-      self.editor_contents.push('~');
+      if i == screen_rows / 3 {
+        let mut welcome = format!("Vimrs --- Version {}\r\n", CONFIG.version);
+        if welcome.len() > screen_columns {
+          welcome.truncate(screen_columns);
+        }
+        let mut welcome_padding = (screen_columns - welcome.len()) / 2;
+        if welcome_padding != 0 {
+          self.editor_contents.push('~');
+          welcome_padding -= 1;
+        }
+        (0..welcome_padding).for_each(|_| self.editor_contents.push(' '));
+        self.editor_contents.push_str(&welcome);
+
+        let mut description = String::from("A text editor written in Rust\r\n");
+        if description.len() > screen_columns {
+          description.truncate(screen_columns);
+        }
+        let mut description_padding = (screen_columns - description.len()) / 2;
+        if description_padding != 0 {
+          self.editor_contents.push('~');
+          description_padding -= 1;
+        }
+        (0..description_padding).for_each(|_| self.editor_contents.push(' '));
+        self.editor_contents.push_str(&description);
+        self.editor_contents.push('~');
+      } else {
+        self.editor_contents.push('~');
+      }
       queue!(
         self.editor_contents,
         terminal::Clear(terminal::ClearType::UntilNewLine),
@@ -175,13 +213,7 @@ impl io::Write for EditorContents {
   }
 
   fn flush(&mut self) -> io::Result<()> {
-    let content;
-    if self.content.contains("~") {
-      content = self.content.purple();
-    } else {
-      content = self.content.normal();
-    }
-    let out = write!(io::stdout(), "{}", content);
+    let out = write!(io::stdout(), "{}", self.content);
     io::stdout().flush()?;
     self.content.clear();
     out
