@@ -72,7 +72,6 @@ impl Output {
     queue!(
       self.editor_contents,
       cursor::Hide,
-      terminal::Clear(terminal::ClearType::All),
       cursor::MoveTo(0, 0),
     )?;
 
@@ -89,8 +88,11 @@ impl Output {
   fn draw_rows(&mut self) {
     let screen_rows = self.window_size.1;
     for i in 0..screen_rows {
-      // Should line numbers be drawn here?
       self.editor_contents.push('~');
+      queue!(
+        self.editor_contents,
+        terminal::Clear(terminal::ClearType::UntilNewLine),
+      ).unwrap();
       if i < screen_rows - 1 {
         self.editor_contents.push_str("\r\n");
       }
@@ -174,7 +176,7 @@ impl io::Write for EditorContents {
 
   fn flush(&mut self) -> io::Result<()> {
     let content;
-    if self.content.contains("~\r\n~\r\n") {
+    if self.content.contains("~") {
       content = self.content.purple();
     } else {
       content = self.content.normal();
