@@ -56,10 +56,12 @@ impl Reader {
 
 */
 struct Output {
-  window_size: (usize, usize),
+  window_size: (usize, usize), // screen_columns: 0, screen_rows: 1
   editor_contents: EditorContents,
   editor_rows: EditorRows,
-  cursor_position: (usize, usize),
+  cursor_position: (usize, usize), // 0: x, 1: y
+  row_offset: usize,
+  column_offset: usize,
 }
 
 impl Output {
@@ -72,6 +74,20 @@ impl Output {
       editor_contents: EditorContents::new(),
       editor_rows: EditorRows::new(),
       cursor_position: (0, 0),
+      row_offset: 0,
+      column_offset: 0,
+    }
+  }
+
+  fn scroll(&mut self) {
+    self.row_offset = cmp::min(self.row_offset, self.cursor_position.1);
+    if self.cursor_position.0 >= self.row_offset + self.window_size.1 {
+      self.row_offset = self.cursor_position.1 - self.window_size.1 + 1;
+    }
+
+    self.column_offset = cmp::min(self.column_offset, self.cursor_position.0);
+    if self.cursor_position.0 >= self.column_offset + self.window_size.0 {
+      self.column_offset = self.cursor_position.0 - self.window_size.0 + 1;
     }
   }
 
@@ -81,6 +97,7 @@ impl Output {
   }
 
   fn refresh_screen(&mut self) -> crossterm::Result<()> {
+    self.scroll();
     queue!(
       self.editor_contents,
       cursor::Hide,
@@ -90,9 +107,12 @@ impl Output {
 
     self.draw_rows();
 
+    let cursor_x = self.cursor_position.0;
+    let cursor_y = self.cursor_position.1 - self.row_offset;
+
     queue!(
       self.editor_contents,
-      cursor::MoveTo(self.cursor_position.0 as u16, self.cursor_position.1 as u16),
+      cursor::MoveTo(cursor_x as u16, cursor_y as u16),
       cursor::Show,
     )?;
     self.editor_contents.flush()
@@ -103,7 +123,8 @@ impl Output {
     let screen_rows = self.window_size.1;
 
     for i in 0..screen_rows {
-      if i >= self.editor_rows.number_of_rows() {
+      let file_row = i + self.row_offset;
+      if file_row >= self.editor_rows.number_of_rows() {
         if self.editor_rows.number_of_rows() == 0 && i == screen_rows / 3 {
           let mut welcome = format!("Vimrs --- Version {}\r\n", CONFIG.version);
           if welcome.len() > screen_columns {
@@ -133,8 +154,11 @@ impl Output {
           self.editor_contents.push('~');
         }
       } else {
-        let len = cmp::min(self.editor_rows.get_row(i).len(), screen_columns);
-        self.editor_contents.push_str(&self.editor_rows.get_row(i)[..len])
+        let row = self.editor_rows.get_row(file_row);
+        let column_offset = self.column_offset;
+        let len = cmp::min(row.len().saturating_sub(column_offset), screen_columns);
+        let start = if len == 0 { 0 } else { column_offset };
+        self.editor_contents.push_str(&row[start..start + len]);
       }
       queue!(
         self.editor_contents,
@@ -146,13 +170,13 @@ impl Output {
     }
   }
 
-  fn move_cursor(&mut self, direction: KeyCode) {
+  fn move_cursor(&mut self, direction: KeyCode, number_of_rows: usize) {
     match direction {
       KeyCode::Up => {
         self.cursor_position.1 = self.cursor_position.1.saturating_sub(1);
       }
       KeyCode::Down => {
-        if self.cursor_position.1 != self.window_size.1 - 1 {
+        if self.cursor_position.1 < number_of_rows {
           self.cursor_position.1 += 1;
         }
       }
@@ -162,9 +186,9 @@ impl Output {
         }
       }
       KeyCode::Right => {
-        if self.cursor_position.0 != self.window_size.0 - 1 {
+        // if self.cursor_position.0 != self.window_size.0 - 1 {
           self.cursor_position.0 += 1;
-        }
+        // }
       }
       KeyCode::End => self.cursor_position.0 = self.window_size.0 - 1,
       KeyCode::Home => self.cursor_position.0 = 0,
@@ -216,7 +240,7 @@ impl Editor {
         ),
         modifiers: event::KeyModifiers::NONE,
         ..
-      } => self.output.move_cursor(direction),
+      } => self.output.move_cursor(direction, self.output.editor_rows.number_of_rows()),
       KeyEvent {
         code: val @ (KeyCode::PageUp | KeyCode::PageDown),
         modifiers: event::KeyModifiers::NONE,
@@ -226,7 +250,7 @@ impl Editor {
             KeyCode::Up
           } else {
             KeyCode::Down
-          });
+          }, self.output.editor_rows.number_of_rows());
         }),
       _ => {},
     }
