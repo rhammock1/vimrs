@@ -1,4 +1,4 @@
-use std::io;
+use std::{cmp, env, fs, io, path::PathBuf};
 use std::io::Write;
 use std::time::Duration;
 use crossterm::{cursor, event, execute, terminal, queue};
@@ -11,7 +11,7 @@ struct Config {
 }
 
 const CONFIG: Config = Config {
-  version: 0.10,
+  version: 0.20,
   poll_timeout: Duration::from_millis(1500),
 };
 
@@ -58,6 +58,7 @@ impl Reader {
 struct Output {
   window_size: (usize, usize),
   editor_contents: EditorContents,
+  editor_rows: EditorRows,
   cursor_position: (usize, usize),
 }
 
@@ -69,6 +70,7 @@ impl Output {
     Self {
       window_size,
       editor_contents: EditorContents::new(),
+      editor_rows: EditorRows::new(),
       cursor_position: (0, 0),
     }
   }
@@ -101,33 +103,38 @@ impl Output {
     let screen_rows = self.window_size.1;
 
     for i in 0..screen_rows {
-      if i == screen_rows / 3 {
-        let mut welcome = format!("Vimrs --- Version {}\r\n", CONFIG.version);
-        if welcome.len() > screen_columns {
-          welcome.truncate(screen_columns);
-        }
-        let mut welcome_padding = (screen_columns - welcome.len()) / 2;
-        if welcome_padding != 0 {
-          self.editor_contents.push('~');
-          welcome_padding -= 1;
-        }
-        (0..welcome_padding).for_each(|_| self.editor_contents.push(' '));
-        self.editor_contents.push_str(&welcome);
+      if i >= self.editor_rows.number_of_rows() {
+        if self.editor_rows.number_of_rows() == 0 && i == screen_rows / 3 {
+          let mut welcome = format!("Vimrs --- Version {}\r\n", CONFIG.version);
+          if welcome.len() > screen_columns {
+            welcome.truncate(screen_columns);
+          }
+          let mut welcome_padding = (screen_columns - welcome.len()) / 2;
+          if welcome_padding != 0 {
+            self.editor_contents.push('~');
+            welcome_padding -= 1;
+          }
+          (0..welcome_padding).for_each(|_| self.editor_contents.push(' '));
+          self.editor_contents.push_str(&welcome);
 
-        let mut description = String::from("A text editor written in Rust\r\n");
-        if description.len() > screen_columns {
-          description.truncate(screen_columns);
-        }
-        let mut description_padding = (screen_columns - description.len()) / 2;
-        if description_padding != 0 {
+          let mut description = String::from("A text editor written in Rust\r\n");
+          if description.len() > screen_columns {
+            description.truncate(screen_columns);
+          }
+          let mut description_padding = (screen_columns - description.len()) / 2;
+          if description_padding != 0 {
+            self.editor_contents.push('~');
+            description_padding -= 1;
+          }
+          (0..description_padding).for_each(|_| self.editor_contents.push(' '));
+          self.editor_contents.push_str(&description);
           self.editor_contents.push('~');
-          description_padding -= 1;
+        } else {
+          self.editor_contents.push('~');
         }
-        (0..description_padding).for_each(|_| self.editor_contents.push(' '));
-        self.editor_contents.push_str(&description);
-        self.editor_contents.push('~');
       } else {
-        self.editor_contents.push('~');
+        let len = cmp::min(self.editor_rows.get_row(i).len(), screen_columns);
+        self.editor_contents.push_str(&self.editor_rows.get_row(i)[..len])
       }
       queue!(
         self.editor_contents,
@@ -268,5 +275,42 @@ impl io::Write for EditorContents {
     io::stdout().flush()?;
     self.content.clear();
     out
+  }
+}
+
+/*
+
+    Editor Rows Structure
+
+*/
+struct EditorRows {
+  row_contents: Vec<Box<str>>,
+}
+
+impl EditorRows {
+  fn new() -> Self {
+    let mut arg = env::args();
+    
+    match arg.nth(1) {
+      None => Self {
+        row_contents: Vec::new(),
+      },
+      Some(file) => Self::from_file(file.into()),
+    }
+  }
+
+  fn from_file(file: PathBuf) -> Self {
+    let file_contents = fs::read_to_string(file).expect("Unable to read file.");
+    Self {
+      row_contents: file_contents.lines().map(|s| s.into()).collect(),
+    }
+  }
+
+  fn number_of_rows(&self) -> usize {
+    self.row_contents.len()
+  }
+
+  fn get_row(&self, at: usize) -> &str {
+    &self.row_contents[at]
   }
 }
