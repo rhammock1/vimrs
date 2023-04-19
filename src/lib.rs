@@ -5,6 +5,8 @@ use crossterm::{cursor, event, execute, terminal, queue};
 use crossterm::event::{Event, KeyCode, KeyEvent};
 use colored::{Colorize, ColoredString};
 
+mod log;
+
 struct Config {
   version: f32,
   poll_timeout: Duration,
@@ -26,6 +28,7 @@ impl Drop for CleanUp {
   // Implement Drop for this struct so that when it goes out of scope,
   // this function automatically runs
   fn drop(&mut self) {
+    log::log::log("INFO".to_string(), "Cleaning up.".to_string());
     terminal::disable_raw_mode().expect("Failed to disable RAW mode.");
     Output::clear_screen().expect("Failed to clear screen.");
   }
@@ -76,11 +79,13 @@ impl Output {
   }
 
   fn clear_screen() -> crossterm::Result<()> {
+    log::log::log("INFO".to_string(), format!("Clearing screen."));
     execute!(io::stdout(), terminal::Clear(terminal::ClearType::All))?;
     execute!(io::stdout(), cursor::MoveTo(0, 0))
   }
 
   fn refresh_screen(&mut self) -> crossterm::Result<()> {
+    log::log::log("INFO".to_string(), "Refreshing screen.".to_string());
     self.cursor_controller.scroll();
     queue!(
       self.editor_contents,
@@ -105,6 +110,8 @@ impl Output {
   fn draw_rows(&mut self) {
     let screen_columns = self.window_size.0;
     let screen_rows = self.window_size.1;
+
+    log::log::log("INFO".to_string(), format!("Drawing rows. Screen columns: {}, screen rows: {}", screen_columns, screen_rows));
 
     for i in 0..screen_rows {
       let file_row = i + self.cursor_controller.row_offset;
@@ -190,7 +197,10 @@ impl Editor {
         code: KeyCode::Char('q'),
         modifiers: event::KeyModifiers::CONTROL,
         ..
-      } => return Ok(false),
+      } => {
+        log::log::log("INFO".to_string(), "Exiting editor.".to_string());
+        return Ok(false)
+      },
       KeyEvent {
         code: direction @ (
           KeyCode::Up 
@@ -202,7 +212,10 @@ impl Editor {
         ),
         modifiers: event::KeyModifiers::NONE,
         ..
-      } => self.output.move_cursor(direction),
+      } => {
+        log::log::log("INFO".to_string(), format!("Moving cursor in direction: {:?}", direction));
+        self.output.move_cursor(direction)
+      },
       KeyEvent {
         code: val @ (KeyCode::PageUp | KeyCode::PageDown),
         modifiers: event::KeyModifiers::NONE,
