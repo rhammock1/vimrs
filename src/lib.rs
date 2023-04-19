@@ -79,7 +79,7 @@ impl Output {
   }
 
   fn clear_screen() -> crossterm::Result<()> {
-    log::log::log("INFO".to_string(), format!("Clearing screen."));
+    log::log::log("INFO".to_string(), format!("Clearing screen.\n\n"));
     execute!(io::stdout(), terminal::Clear(terminal::ClearType::All))?;
     execute!(io::stdout(), cursor::MoveTo(0, 0))
   }
@@ -342,7 +342,7 @@ impl CursorController {
 
   fn scroll(&mut self) {
     self.row_offset = cmp::min(self.row_offset, self.cursor_y);
-    if self.cursor_x >= self.row_offset + self.screen_rows {
+    if self.cursor_y >= self.row_offset + self.screen_rows {
       self.row_offset = self.cursor_y - self.screen_rows + 1;
     }
 
@@ -366,17 +366,33 @@ impl CursorController {
       KeyCode::Left => {
         if self.cursor_x != 0 {
           self.cursor_x -= 1;
+        } else if self.cursor_y > 0 {
+          self.cursor_y -= 1;
+          self.cursor_x = editor_rows.get_row(self.cursor_y).len();
         }
       }
       KeyCode::Right => {
-        if self.cursor_y < number_of_rows
-        && self.cursor_x < editor_rows.get_row(self.cursor_y).len() {
-          self.cursor_x += 1;
+        if self.cursor_y < number_of_rows {
+          match self.cursor_x.cmp(&editor_rows.get_row(self.cursor_y).len()) {
+            cmp::Ordering::Less => self.cursor_x += 1,
+            cmp::Ordering::Equal => {
+              self.cursor_y += 1;
+              self.cursor_x = 0;
+            },
+            _ => {},
+          }
         }
       }
       KeyCode::End => self.cursor_x = self.screen_columns - 1,
       KeyCode::Home => self.cursor_x = 0,
       _ => unimplemented!("Invalid keypress"),
     }
+
+    let row_length = if self.cursor_y < number_of_rows {
+      editor_rows.get_row(self.cursor_y).len()
+    } else {
+      0
+    };
+    self.cursor_x = cmp::min(self.cursor_x, row_length);
   }
 }
