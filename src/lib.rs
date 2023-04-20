@@ -222,13 +222,24 @@ impl Editor {
         code: val @ (KeyCode::PageUp | KeyCode::PageDown),
         modifiers: event::KeyModifiers::NONE,
         ..
-      } => (0..self.output.window_size.1).for_each(|_| {
+      } => {
+        log::log::log("INFO".to_string(), format!("Moving cursor in direction: {:?}", val));
+        if matches!(val, KeyCode::PageUp) {
+          self.output.cursor_controller.cursor_y = self.output.cursor_controller.row_offset;
+        } else {
+          self.output.cursor_controller.cursor_y = cmp::min(
+            self.output.window_size.1 + self.output.cursor_controller.row_offset - 1,
+            self.output.editor_rows.number_of_rows(),
+          );
+        }
+        (0..self.output.window_size.1).for_each(|_| {
           self.output.move_cursor(if matches!(val, KeyCode::PageUp) {
             KeyCode::Up
           } else {
             KeyCode::Down
           });
-        }),
+        })
+      },
       _ => {},
     }
     Ok(true)
@@ -459,7 +470,11 @@ impl CursorController {
           }
         }
       }
-      KeyCode::End => self.cursor_x = self.screen_columns - 1,
+      KeyCode::End => {
+        if self.cursor_y < number_of_rows {
+          self.cursor_x = editor_rows.get_row(self.cursor_y).len();
+        }
+      }
       KeyCode::Home => self.cursor_x = 0,
       _ => unimplemented!("Invalid keypress"),
     }
