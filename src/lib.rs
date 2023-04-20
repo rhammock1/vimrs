@@ -1,7 +1,7 @@
 use std::{cmp, env, fs, io, path::PathBuf};
 use std::io::Write;
 use std::time::Duration;
-use crossterm::{cursor, event, execute, terminal, queue};
+use crossterm::{cursor, event, execute, terminal, queue, style};
 use crossterm::event::{Event, KeyCode, KeyEvent};
 use colored::{Colorize, ColoredString};
 
@@ -70,7 +70,7 @@ struct Output {
 impl Output {
   fn new() -> Self {
     let window_size = terminal::size()
-      .map(|(x, y)| (x as usize, y as usize))
+      .map(|(x, y)| (x as usize, y as usize - 1))
       .unwrap();
     Self {
       window_size,
@@ -97,6 +97,7 @@ impl Output {
     )?;
 
     self.draw_rows();
+    self.draw_status_bar();
 
     let cursor_x = self.cursor_controller.render_x - self.cursor_controller.column_offset;
     let cursor_y = self.cursor_controller.cursor_y - self.cursor_controller.row_offset;
@@ -157,14 +158,26 @@ impl Output {
         self.editor_contents,
         terminal::Clear(terminal::ClearType::UntilNewLine),
       ).unwrap();
-      if i < screen_rows - 1 {
-        self.editor_contents.push_str("\r\n");
-      }
+      // if i < screen_rows - 1 {
+      self.editor_contents.push_str("\r\n");
+      // }
     }
   }
 
   fn move_cursor(&mut self, direction: KeyCode) {
     self.cursor_controller.move_cursor(direction, &self.editor_rows);
+  }
+
+  fn draw_status_bar(&mut self) {
+    // Invert color
+    self.editor_contents
+      .push_str(&style::Attribute::Reverse.to_string());
+    
+    (0..self.window_size.0).for_each(|_| self.editor_contents.push(' '));
+    
+    // Reset color
+    self.editor_contents
+      .push_str(&style::Attribute::Reset.to_string());
   }
 }
 
