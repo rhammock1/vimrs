@@ -1,6 +1,6 @@
 use std::{cmp, env, fs, io, path::PathBuf};
 use std::io::Write;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use crossterm::{cursor, event, execute, terminal, queue, style};
 use crossterm::event::{Event, KeyCode, KeyEvent};
 use colored::{Colorize, ColoredString};
@@ -11,12 +11,14 @@ struct Config {
   version: f32,
   poll_timeout: Duration,
   spaces_per_tab: usize,
+  message_timeout: u64,
 }
 
 const CONFIG: Config = Config {
   version: 0.20,
   poll_timeout: Duration::from_millis(1500),
   spaces_per_tab: 2,
+  message_timeout: 5,
 };
 
 /*  
@@ -65,18 +67,20 @@ struct Output {
   editor_contents: EditorContents,
   editor_rows: EditorRows,
   cursor_controller: CursorController,
+  status_message: StatusMessage,
 }
 
 impl Output {
   fn new() -> Self {
     let window_size = terminal::size()
-      .map(|(x, y)| (x as usize, y as usize - 1))
+      .map(|(x, y)| (x as usize, y as usize - 2))
       .unwrap();
     Self {
       window_size,
       editor_contents: EditorContents::new(),
       editor_rows: EditorRows::new(),
       cursor_controller: CursorController::new(window_size),
+      status_message: StatusMessage::new("HELP: Ctrl-Q = Quit".into()),
     }
   }
 
@@ -97,7 +101,11 @@ impl Output {
     )?;
 
     self.draw_rows();
+
+    // TODO- Only draw status bar if there is a message or there has been a timeout
     self.draw_status_bar();
+
+    self.draw_message_bar();
 
     let cursor_x = self.cursor_controller.render_x - self.cursor_controller.column_offset;
     let cursor_y = self.cursor_controller.cursor_y - self.cursor_controller.row_offset;
@@ -158,9 +166,8 @@ impl Output {
         self.editor_contents,
         terminal::Clear(terminal::ClearType::UntilNewLine),
       ).unwrap();
-      // if i < screen_rows - 1 {
+
       self.editor_contents.push_str("\r\n");
-      // }
     }
   }
 
@@ -206,6 +213,20 @@ impl Output {
     // Reset color
     self.editor_contents
       .push_str(&style::Attribute::Reset.to_string());
+
+    self.editor_contents.push_str("\r\n");
+  }
+
+  fn draw_message_bar(&mut self) {
+    queue!(
+      self.editor_contents,
+      terminal::Clear(terminal::ClearType::UntilNewLine),
+    ).unwrap();
+
+    if let Some(msg) = self.status_message.message() {
+      self.editor_contents
+        .push_str(&msg[..cmp::min(self.window_size.0, msg.len())]);
+    }
   }
 }
 
@@ -529,5 +550,43 @@ impl CursorController {
       0
     };
     self.cursor_x = cmp::min(self.cursor_x, row_length);
+  }
+}
+
+/*
+
+    Status Message Structure
+
+*/
+
+struct StatusMessage {
+  message: Option<String>,
+  set_time: Option<Instant>,
+}
+
+impl StatusMessage {
+  fn new(initial_message: String) -> Self {
+    Self {
+      message: Some(initial_message),
+      set_time: Some(Instant::now()),
+    }
+  }
+
+  fn set_message(&mut self, message: String) {
+    self.message = Some(message);
+    self.set_time = Some(Instant::now());
+  }
+
+  fn message(&mut self) -> Option<&String> {
+    self.set_time
+      .and_then(|time| {
+        if time.elapsed() > Duration::from_secs(CONFIG.message_timeout) {
+          self.message = None;
+          self.set_time = None;
+          None
+        } else {
+          Some(self.message.as_ref().unwrap())
+        }
+      })
   }
 }
