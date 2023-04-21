@@ -172,9 +172,37 @@ impl Output {
     // Invert color
     self.editor_contents
       .push_str(&style::Attribute::Reverse.to_string());
-    
-    (0..self.window_size.0).for_each(|_| self.editor_contents.push(' '));
-    
+
+    let info = format!(
+      "{} -- {} lines",
+      self.editor_rows
+        .filename
+        .as_ref()
+        .and_then(|path| path.file_name())
+        .and_then(|filename| filename.to_str())
+        .unwrap_or("[Untitled]"),
+      self.editor_rows.number_of_rows()
+    );
+
+    let info_length = cmp::min(info.len(), self.window_size.0);
+
+    let line_info = format!(
+      "{} / {}",
+      self.cursor_controller.cursor_y + 1,
+      self.editor_rows.number_of_rows()
+    );
+
+    self.editor_contents.push_str(&info[..info_length]);
+
+    for i in info_length..self.window_size.0 {
+      if self.window_size.0 - i == line_info.len() {
+        self.editor_contents.push_str(&line_info);
+        break;
+      } else {
+        self.editor_contents.push(' ');
+      }
+    }
+        
     // Reset color
     self.editor_contents
       .push_str(&style::Attribute::Reset.to_string());
@@ -329,6 +357,7 @@ impl Row {
 */
 struct EditorRows {
   row_contents: Vec<Row>,
+  filename: Option<PathBuf>,
 }
 
 impl EditorRows {
@@ -338,14 +367,16 @@ impl EditorRows {
     match arg.nth(1) {
       None => Self {
         row_contents: Vec::new(),
+        filename: None,
       },
       Some(file) => Self::from_file(file.into()),
     }
   }
 
   fn from_file(file: PathBuf) -> Self {
-    let file_contents = fs::read_to_string(file).expect("Unable to read file.");
+    let file_contents = fs::read_to_string(&file).expect("Unable to read file.");
     Self {
+      filename: Some(file),
       row_contents: file_contents
         .lines()
         .map(|s| {
