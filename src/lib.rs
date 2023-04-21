@@ -194,9 +194,9 @@ impl Output {
     let info_length = cmp::min(info.len(), self.window_size.0);
 
     let line_info = format!(
-      "{} / {}",
+      "Ln {}, Col {}",
       self.cursor_controller.cursor_y + 1,
-      self.editor_rows.number_of_rows()
+      self.cursor_controller.cursor_x + 1,
     );
 
     self.editor_contents.push_str(&info[..info_length]);
