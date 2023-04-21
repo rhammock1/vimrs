@@ -83,6 +83,17 @@ impl Output {
       status_message: StatusMessage::new("HELP: Ctrl-Q = Quit".into()),
     }
   }
+  
+  fn insert_character(&mut self, character: char) {
+    if self.cursor_controller.cursor_y == self.editor_rows.number_of_rows() {
+      self.editor_rows.insert_row()
+    }
+    self.editor_rows
+      .get_editor_row_mut(self.cursor_controller.cursor_y)
+      .insert_character(self.cursor_controller.cursor_x, character);
+
+    self.cursor_controller.cursor_x += 1;
+  }
 
   fn clear_screen() -> crossterm::Result<()> {
     log::log::log("INFO".to_string(), format!("Clearing screen.\n\n"));
@@ -302,6 +313,15 @@ impl Editor {
           });
         })
       },
+      KeyEvent {
+        code: code @ (KeyCode::Char(..) | KeyCode::Tab),
+        modifiers: event::KeyModifiers::NONE | event::KeyModifiers::SHIFT,
+        ..
+      } => self.output.insert_character(match code {
+        KeyCode::Char(ch) => ch,
+        KeyCode::Tab => '\t',
+        _ => unreachable!(),
+      }),
       _ => {},
     }
     Ok(true)
@@ -375,10 +395,6 @@ impl Row {
     self.row_content.insert(at, character);
     EditorRows::render_row(self)
   }
-
-  fn insert_row(&mut self) {
-    self.row_content.push(Default::default());
-  }
 }
 
 /*
@@ -402,6 +418,14 @@ impl EditorRows {
       },
       Some(file) => Self::from_file(file.into()),
     }
+  }
+
+  fn get_editor_row_mut(&mut self, at: usize) -> &mut Row {
+    &mut self.row_contents[at]
+  }
+
+  fn insert_row(&mut self) {
+    self.row_contents.push(Row::default());
   }
 
   fn from_file(file: PathBuf) -> Self {
