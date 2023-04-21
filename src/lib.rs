@@ -357,17 +357,27 @@ impl io::Write for EditorContents {
     Row Structure
 
 */
+#[derive(Default)]
 struct Row {
-  row_content: Box<str>,
+  row_content: String,
   render: String,
 }
 
 impl Row {
-  fn new(row_content: Box<str>, render: String) -> Self {
+  fn new(row_content: String, render: String) -> Self {
     Self {
       row_content,
       render,
     }
+  }
+
+  fn insert_character(&mut self, at: usize, character: char) {
+    self.row_content.insert(at, character);
+    EditorRows::render_row(self)
+  }
+
+  fn insert_row(&mut self) {
+    self.row_content.push(Default::default());
   }
 }
 
