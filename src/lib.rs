@@ -192,14 +192,18 @@ impl Output {
       .push_str(&style::Attribute::Reverse.to_string());
 
     let info = format!(
-      "{} -- {} lines",
+      "\"{}\" {} Lines, {:?}B written",
       self.editor_rows
         .filename
         .as_ref()
         .and_then(|path| path.file_name())
         .and_then(|filename| filename.to_str())
         .unwrap_or("[Untitled]"),
-      self.editor_rows.number_of_rows()
+      self.editor_rows.number_of_rows(),
+      match self.editor_rows.file_size {
+        Some(size) => size,
+        _ => 0,
+      }
     );
 
     let info_length = cmp::min(info.len(), self.window_size.0);
@@ -413,6 +417,7 @@ impl Row {
 struct EditorRows {
   row_contents: Vec<Row>,
   filename: Option<PathBuf>,
+  file_size: Option<u64>,
 }
 
 impl EditorRows {
@@ -423,12 +428,13 @@ impl EditorRows {
       None => Self {
         row_contents: Vec::new(),
         filename: None,
+        file_size: None,
       },
       Some(file) => Self::from_file(file.into()),
     }
   }
 
-  fn save(&self) -> io::Result<()> {
+  fn save(&mut self) -> io::Result<()> {
     match &self.filename {
       None => Err(io::Error::new(io::ErrorKind::Other, "No filename specified.")),
       Some(name) => {
@@ -444,8 +450,11 @@ impl EditorRows {
           .collect::<Vec<&str>>()
           .join("\n");
 
-        file.set_len(contents.len() as u64)?;
+        let size = contents.len() as u64;
+        file.set_len(size)?;
+        self.file_size = Some(size);
         file.write_all(contents.as_bytes())
+
       }
     }
   }
@@ -480,6 +489,7 @@ impl EditorRows {
           row
         })
         .collect(),
+      file_size: Some(file_contents.len() as u64),
     }
   }
 
