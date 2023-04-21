@@ -15,7 +15,7 @@ struct Config {
 }
 
 const CONFIG: Config = Config {
-  version: 0.20,
+  version: 0.30,
   poll_timeout: Duration::from_millis(1500),
   spaces_per_tab: 2,
   message_timeout: 5,
