@@ -314,6 +314,14 @@ impl Editor {
         })
       },
       KeyEvent {
+        code: KeyCode::Char('s'),
+        modifiers: event::KeyModifiers::CONTROL,
+        ..
+      } => {
+        log::log::log("INFO".to_string(), "Saving file.".to_string());
+        self.output.editor_rows.save()?;
+      },
+      KeyEvent {
         code: code @ (KeyCode::Char(..) | KeyCode::Tab),
         modifiers: event::KeyModifiers::NONE | event::KeyModifiers::SHIFT,
         ..
@@ -420,6 +428,28 @@ impl EditorRows {
     }
   }
 
+  fn save(&self) -> io::Result<()> {
+    match &self.filename {
+      None => Err(io::Error::new(io::ErrorKind::Other, "No filename specified.")),
+      Some(name) => {
+        let mut file = fs::OpenOptions::new()
+          .write(true)
+          .create(true)
+          .open(name)?;
+
+        let contents: String = self
+          .row_contents
+          .iter()
+          .map(|it| it.row_content.as_str())
+          .collect::<Vec<&str>>()
+          .join("\n");
+
+        file.set_len(contents.len() as u64)?;
+        file.write_all(contents.as_bytes())
+      }
+    }
+  }
+
   fn get_editor_row_mut(&mut self, at: usize) -> &mut Row {
     &mut self.row_contents[at]
   }
@@ -429,7 +459,17 @@ impl EditorRows {
   }
 
   fn from_file(file: PathBuf) -> Self {
+    // Create the file if it doesn't exist
+    fs::OpenOptions::new()
+      .write(true)
+      .create(true)
+      .read(true)
+      .open(&file)
+      .expect("Unable to create file.");
+
+    // Convert file_contents to string
     let file_contents = fs::read_to_string(&file).expect("Unable to read file.");
+
     Self {
       filename: Some(file),
       row_contents: file_contents
