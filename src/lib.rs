@@ -43,7 +43,7 @@ impl Drop for CleanUp {
     READER STRUCTURE
 
 */
-pub struct Reader;
+struct Reader;
 
 impl Reader {
   fn read(&self) -> crossterm::Result<KeyEvent> {
@@ -253,6 +253,7 @@ impl Output {
 pub struct Editor {
   reader: Reader,
   output: Output,
+  previous_key: Option<KeyCode>,
 }
 
 impl Editor {
@@ -262,6 +263,7 @@ impl Editor {
     Ok(Self {
       reader: Reader,
       output: Output::new(),
+      previous_key: None,
     })
   }
 
@@ -270,15 +272,18 @@ impl Editor {
     self.process_keypress()
   }
 
+  fn set_previous_key(&mut self, key: KeyCode) {
+    self.previous_key = Some(key);
+  }
+
   fn process_keypress(&mut self) -> crossterm::Result<bool> {
     match self.reader.read()? {
       KeyEvent {
-        code: KeyCode::Char('q'),
-        modifiers: event::KeyModifiers::CONTROL,
+        code: KeyCode::Char(':'),
+        modifiers: event::KeyModifiers::NONE,
         ..
       } => {
-        log::log::log("INFO".to_string(), "Exiting editor.".to_string());
-        return Ok(false)
+        self.set_previous_key(KeyCode::Char(':'));
       },
       KeyEvent {
         code: direction @ (
@@ -293,6 +298,7 @@ impl Editor {
         ..
       } => {
         log::log::log("INFO".to_string(), format!("Moving cursor in direction: {:?}", direction));
+        self.set_previous_key(direction);
         self.output.move_cursor(direction)
       },
       KeyEvent {
@@ -301,6 +307,7 @@ impl Editor {
         ..
       } => {
         log::log::log("INFO".to_string(), format!("Moving cursor in direction: {:?}", val));
+        self.set_previous_key(val);
         if matches!(val, KeyCode::PageUp) {
           self.output.cursor_controller.cursor_y = self.output.cursor_controller.row_offset;
         } else {
@@ -318,12 +325,38 @@ impl Editor {
         })
       },
       KeyEvent {
-        code: KeyCode::Char('s'),
-        modifiers: event::KeyModifiers::CONTROL,
+        code: KeyCode::Char('w'),
+        modifiers: event::KeyModifiers::NONE,
         ..
       } => {
         log::log::log("INFO".to_string(), "Saving file.".to_string());
-        self.output.editor_rows.save()?;
+        if self.previous_key == Some(KeyCode::Char(':')) {
+          self.output.editor_rows.save()?;
+        } else {
+          self.set_previous_key(KeyCode::Char('w'));
+          self.output.insert_character(match KeyCode::Char('w') {
+            KeyCode::Char(ch) => ch,
+            KeyCode::Tab => '\t',
+            _ => unreachable!(),
+          })
+        }
+      },
+      KeyEvent {
+        code: KeyCode::Char('q'),
+        modifiers: event::KeyModifiers::NONE,
+        ..
+      } => {
+        log::log::log("INFO".to_string(), "Exiting editor.".to_string());
+        if self.previous_key == Some(KeyCode::Char(':')) {
+          return Ok(false);
+        } else {
+          self.set_previous_key(KeyCode::Char('q'));
+          self.output.insert_character(match KeyCode::Char('q') {
+            KeyCode::Char(ch) => ch,
+            KeyCode::Tab => '\t',
+            _ => unreachable!(),
+          })
+        }
       },
       KeyEvent {
         code: code @ (KeyCode::Char(..) | KeyCode::Tab),
