@@ -1,4 +1,4 @@
-use vimrs::{CleanUp, Editor};
+use vimrs::{CleanUp, editor::editor::Editor};
 
 fn main() -> crossterm::Result<()> {
   // Prefix with underscore so Rust ignores it as unused
