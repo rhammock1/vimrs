@@ -70,6 +70,7 @@ struct Output {
   editor_rows: EditorRows,
   cursor_controller: CursorController,
   status_message: StatusMessage,
+  dirty: bool,
 }
 
 impl Output {
@@ -83,18 +84,21 @@ impl Output {
       editor_rows: EditorRows::new(),
       cursor_controller: CursorController::new(window_size),
       status_message: StatusMessage::new("HELP: :w = Save | :q = Quit".into()),
+      dirty: false,
     }
   }
   
   fn insert_character(&mut self, character: char) {
     if self.cursor_controller.cursor_y == self.editor_rows.number_of_rows() {
-      self.editor_rows.insert_row()
+      self.editor_rows.insert_row();
+      self.dirty = true;
     }
     self.editor_rows
       .get_editor_row_mut(self.cursor_controller.cursor_y)
       .insert_character(self.cursor_controller.cursor_x, character);
 
     self.cursor_controller.cursor_x += 1;
+    self.dirty = true;
   }
 
   fn clear_screen() -> crossterm::Result<()> {
@@ -194,7 +198,8 @@ impl Output {
       .push_str(&style::Attribute::Reverse.to_string());
 
     let info = format!(
-      "\"{}\" {} Lines, {:?}B written",
+      // Name, number of lines, size in bytes
+      "\"{}\" {} Lines, {:?}B written    {}",
       self.editor_rows
         .filename
         .as_ref()
@@ -205,7 +210,8 @@ impl Output {
       match self.editor_rows.file_size {
         Some(size) => size,
         _ => 0,
-      }
+      },
+      if self.dirty { "(modified)" } else { "" },
     );
 
     let info_length = cmp::min(info.len(), self.window_size.0);
@@ -339,6 +345,7 @@ impl Editor {
         // TODO- Check that a filename has been provided, if not, prompt for one
         if self.previous_3_keys.last() == Some(&KeyCode::Char(':')) {
           self.output.editor_rows.save()?;
+          self.output.dirty = false;
         } else {
           self.set_previous_key(KeyCode::Char('w'));
           self.output.insert_character('w')
