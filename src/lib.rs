@@ -32,7 +32,7 @@ pub const CONFIG: Config = Config {
 #[macro_export]
 macro_rules! prompt {
   ($output:expr, $($args:tt)*) => {{
-    let output: &mut Output = &mut $output;
+    let output: &mut Output = $output;
     let mut input = String::with_capacity(CONFIG.max_new_filename_length);
     loop {
       output.status_message.set_message(format!($($args)*, input));

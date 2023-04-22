@@ -1,9 +1,14 @@
 use std::{io, cmp};
 use std::io::Write;
-use crossterm::{cursor, execute, terminal, queue, style};
-use crossterm::event::{KeyCode};
+use crossterm::{cursor, event, execute, terminal, queue, style};
+use crossterm::event::{KeyCode, KeyEvent};
 
-use crate::{log, CONFIG};
+use crate::{
+  log,
+  prompt,
+  CONFIG,
+  Reader,
+};
 use super::{
   cursor::CursorController,
   editor::{
@@ -34,6 +39,21 @@ impl Output {
       status_message: StatusMessage::new("HELP: :w = Save | :q = Quit".into()),
       dirty: false,
     }
+  }
+
+  pub fn find(&mut self) -> io::Result<()> {
+    if let Some(keyword) = prompt!(self, "Search: {} (ESC to cancel)") {
+      for i in 0..self.editor_rows.number_of_rows() {
+        let row = self.editor_rows.get_editor_row(i);
+        if let Some(index) = row.render.find(&keyword) {
+          self.cursor_controller.cursor_y = i;
+          self.cursor_controller.cursor_x = index;
+          self.cursor_controller.row_offset = self.editor_rows.number_of_rows();
+          break;
+        }
+      }
+    }
+    Ok(())
   }
 
   pub fn insert_newline(&mut self) {
