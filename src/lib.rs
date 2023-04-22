@@ -101,6 +101,20 @@ impl Output {
     self.dirty = true;
   }
 
+  fn delete_character(&mut self) {
+    if self.cursor_controller.cursor_y == self.editor_rows.number_of_rows() {
+      return;
+    }
+    let row = self.editor_rows
+      .get_editor_row_mut(self.cursor_controller.cursor_y);
+
+    if self.cursor_controller.cursor_x > 0 {
+      row.delete_character(self.cursor_controller.cursor_x - 1);
+      self.cursor_controller.cursor_x -= 1;
+      self.dirty = true;
+    }
+  }
+
   fn clear_screen() -> crossterm::Result<()> {
     log::log::log("INFO".to_string(), format!("Clearing screen.\n\n"));
     execute!(io::stdout(), terminal::Clear(terminal::ClearType::All))?;
@@ -289,13 +303,7 @@ impl Editor {
 
   fn process_keypress(&mut self) -> crossterm::Result<bool> {
     match self.reader.read()? {
-      KeyEvent {
-        code: KeyCode::Char(':'),
-        modifiers: event::KeyModifiers::NONE,
-        ..
-      } => {
-        self.set_previous_key(KeyCode::Char(':'));
-      },
+      /* Cursor Control */
       KeyEvent {
         code: direction @ (
           KeyCode::Up 
@@ -335,7 +343,15 @@ impl Editor {
           });
         })
       },
+      /* End Cursor Control */
       /* Flow Control */
+      KeyEvent {
+        code: KeyCode::Char(':'),
+        modifiers: event::KeyModifiers::NONE,
+        ..
+      } => {
+        self.set_previous_key(KeyCode::Char(':'));
+      },
       KeyEvent {
         code: KeyCode::Char('w'),
         modifiers: event::KeyModifiers::NONE,
@@ -345,6 +361,7 @@ impl Editor {
         // TODO- Check that a filename has been provided, if not, prompt for one
         if self.previous_3_keys.last() == Some(&KeyCode::Char(':')) {
           self.output.editor_rows.save()?;
+          self.output.status_message.set_message("File saved.".to_string());
           self.output.dirty = false;
         } else {
           self.set_previous_key(KeyCode::Char('w'));
@@ -357,12 +374,18 @@ impl Editor {
         ..
       } => {
         log::log::log("INFO".to_string(), "Exiting editor.".to_string());
-        if self.output.dirty {
-          log::log::log("INFO".to_string(), "File has unsaved changes.".to_string());
-          self.set_previous_key(KeyCode::Char('q'));
-          self.output.status_message.set_message("File has unsaved changes. Press :q! to exit without saving.".to_string())
-        } else if self.previous_3_keys.last() == Some(&KeyCode::Char(':')) {
+        if self.previous_3_keys.last() == Some(&KeyCode::Char('w'))
+          && self.previous_3_keys.get(1) == Some(&KeyCode::Char(':')) {
+          // This is already saved so we can exit
           return Ok(false);
+        } else if self.previous_3_keys.last() == Some(&KeyCode::Char(':')) {
+          if self.output.dirty {
+            log::log::log("INFO".to_string(), "File has unsaved changes.".to_string());
+            self.set_previous_key(KeyCode::Char('q'));
+            self.output.status_message.set_message("File has unsaved changes. Press :q! to exit without saving.".to_string())
+          } else {
+            return Ok(false);
+          }
         } else {
           self.set_previous_key(KeyCode::Char('q'));
           self.output.insert_character('q')
@@ -377,11 +400,23 @@ impl Editor {
           && self.previous_3_keys.get(1) == Some(&KeyCode::Char(':')) {
           log::log::log("INFO".to_string(), "Exiting without saving.".to_string());
           return Ok(false);
-          }
+        } else {
+          self.set_previous_key(KeyCode::Char('!'));
+          self.output.insert_character('!')
+        }
       }
       /* End Flow Control */
-      /* Utility Keys */
-      /* End Utility Keys */
+      /* Text Control */
+      KeyEvent {
+        code: key @ (KeyCode::Backspace | KeyCode::Delete),
+        modifiers: event::KeyModifiers::NONE,
+        ..
+      } => {
+        if matches!(key, KeyCode::Delete) {
+          self.output.move_cursor(KeyCode::Right)
+        }
+        self.output.delete_character()
+      },
       KeyEvent {
         code: code @ (KeyCode::Char(..) | KeyCode::Tab),
         modifiers: event::KeyModifiers::NONE | event::KeyModifiers::SHIFT,
@@ -398,6 +433,7 @@ impl Editor {
           _ => unreachable!(),
         })
       },
+      /* End Text Control */
       _ => {},
     }
     Ok(true)
@@ -469,6 +505,11 @@ impl Row {
 
   fn insert_character(&mut self, at: usize, character: char) {
     self.row_content.insert(at, character);
+    EditorRows::render_row(self)
+  }
+
+  fn delete_character(&mut self, at: usize) {
+    self.row_content.remove(at);
     EditorRows::render_row(self)
   }
 }
