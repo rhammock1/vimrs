@@ -357,13 +357,28 @@ impl Editor {
         ..
       } => {
         log::log::log("INFO".to_string(), "Exiting editor.".to_string());
-        if self.previous_3_keys.last() == Some(&KeyCode::Char(':')) {
+        if self.output.dirty {
+          log::log::log("INFO".to_string(), "File has unsaved changes.".to_string());
+          self.set_previous_key(KeyCode::Char('q'));
+          self.output.status_message.set_message("File has unsaved changes. Press :q! to exit without saving.".to_string())
+        } else if self.previous_3_keys.last() == Some(&KeyCode::Char(':')) {
           return Ok(false);
         } else {
           self.set_previous_key(KeyCode::Char('q'));
           self.output.insert_character('q')
         }
       },
+      KeyEvent {
+        code: KeyCode::Char('!'),
+        modifiers: event::KeyModifiers::NONE,
+        ..
+      } => {
+        if self.previous_3_keys.last() == Some(&KeyCode::Char('q'))
+          && self.previous_3_keys.get(1) == Some(&KeyCode::Char(':')) {
+          log::log::log("INFO".to_string(), "Exiting without saving.".to_string());
+          return Ok(false);
+          }
+      }
       /* End Flow Control */
       /* Utility Keys */
       /* End Utility Keys */
@@ -371,11 +386,18 @@ impl Editor {
         code: code @ (KeyCode::Char(..) | KeyCode::Tab),
         modifiers: event::KeyModifiers::NONE | event::KeyModifiers::SHIFT,
         ..
-      } => self.output.insert_character(match code {
-        KeyCode::Char(ch) => ch,
-        KeyCode::Tab => '\t',
-        _ => unreachable!(),
-      }),
+      } => {
+        self.set_previous_key(match code {
+          KeyCode::Char(ch) => KeyCode::Char(ch),
+          KeyCode::Tab => KeyCode::Tab,
+          _ => unreachable!(),
+        });
+        self.output.insert_character(match code {
+          KeyCode::Char(ch) => ch,
+          KeyCode::Tab => '\t',
+          _ => unreachable!(),
+        })
+      },
       _ => {},
     }
     Ok(true)
@@ -605,7 +627,7 @@ impl CursorController {
       .chars()
       .fold(0, |render_x, c| {
         if c == '\t' {
-          render_x + (CONFIG.spaces_per_tab - 1) - (render_x % CONFIG.spaces_per_tab)
+          render_x + (CONFIG.spaces_per_tab - 1) - (render_x % CONFIG.spaces_per_tab) + 1
         } else {
           render_x + 1
         }
