@@ -82,7 +82,7 @@ impl Output {
       editor_contents: EditorContents::new(),
       editor_rows: EditorRows::new(),
       cursor_controller: CursorController::new(window_size),
-      status_message: StatusMessage::new("HELP: Ctrl-Q = Quit".into()),
+      status_message: StatusMessage::new("HELP: :q = Quit".into()),
     }
   }
   
