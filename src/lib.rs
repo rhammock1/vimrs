@@ -12,6 +12,7 @@ struct Config {
   poll_timeout: Duration,
   spaces_per_tab: usize,
   message_timeout: u64,
+  // command_character: KeyCode,
 }
 
 const CONFIG: Config = Config {
@@ -19,6 +20,7 @@ const CONFIG: Config = Config {
   poll_timeout: Duration::from_millis(1500),
   spaces_per_tab: 2,
   message_timeout: 5,
+  // command_character: KeyCode::Char(':'), // TODO- Actually use this
 };
 
 /*  
@@ -253,7 +255,7 @@ impl Output {
 pub struct Editor {
   reader: Reader,
   output: Output,
-  previous_key: Option<KeyCode>,
+  previous_3_keys: Vec<KeyCode>,
 }
 
 impl Editor {
@@ -263,7 +265,7 @@ impl Editor {
     Ok(Self {
       reader: Reader,
       output: Output::new(),
-      previous_key: None,
+      previous_3_keys: Vec::new(),
     })
   }
 
@@ -273,7 +275,10 @@ impl Editor {
   }
 
   fn set_previous_key(&mut self, key: KeyCode) {
-    self.previous_key = Some(key);
+    self.previous_3_keys.push(key);
+    if self.previous_3_keys.len() > 3 {
+      self.previous_3_keys.remove(0);
+    }
   }
 
   fn process_keypress(&mut self) -> crossterm::Result<bool> {
@@ -324,21 +329,19 @@ impl Editor {
           });
         })
       },
+      /* Flow Control */
       KeyEvent {
         code: KeyCode::Char('w'),
         modifiers: event::KeyModifiers::NONE,
         ..
       } => {
         log::log::log("INFO".to_string(), "Saving file.".to_string());
-        if self.previous_key == Some(KeyCode::Char(':')) {
+        // TODO- Check that a filename has been provided, if not, prompt for one
+        if self.previous_3_keys.last() == Some(&KeyCode::Char(':')) {
           self.output.editor_rows.save()?;
         } else {
           self.set_previous_key(KeyCode::Char('w'));
-          self.output.insert_character(match KeyCode::Char('w') {
-            KeyCode::Char(ch) => ch,
-            KeyCode::Tab => '\t',
-            _ => unreachable!(),
-          })
+          self.output.insert_character('w')
         }
       },
       KeyEvent {
@@ -347,17 +350,16 @@ impl Editor {
         ..
       } => {
         log::log::log("INFO".to_string(), "Exiting editor.".to_string());
-        if self.previous_key == Some(KeyCode::Char(':')) {
+        if self.previous_3_keys.last() == Some(&KeyCode::Char(':')) {
           return Ok(false);
         } else {
           self.set_previous_key(KeyCode::Char('q'));
-          self.output.insert_character(match KeyCode::Char('q') {
-            KeyCode::Char(ch) => ch,
-            KeyCode::Tab => '\t',
-            _ => unreachable!(),
-          })
+          self.output.insert_character('q')
         }
       },
+      /* End Flow Control */
+      /* Utility Keys */
+      /* End Utility Keys */
       KeyEvent {
         code: code @ (KeyCode::Char(..) | KeyCode::Tab),
         modifiers: event::KeyModifiers::NONE | event::KeyModifiers::SHIFT,
