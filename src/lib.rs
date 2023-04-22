@@ -45,6 +45,14 @@ macro_rules! prompt {
           }
         },
         KeyEvent {
+          code: KeyCode::Esc,
+          ..
+        } => {
+          output.status_message.set_message(String::new());
+          input.clear();
+          break;
+        }
+        KeyEvent {
           code: KeyCode::Backspace,
           modifiers: event::KeyModifiers::NONE,
           ..
@@ -447,7 +455,16 @@ impl Editor {
         // TODO- Check that a filename has been provided, if not, prompt for one
         if self.previous_3_keys.last() == Some(&KeyCode::Char(':')) {
           if matches!(self.output.editor_rows.filename, None) {
-            self.output.editor_rows.filename = prompt!(&mut self.output, "Save as: {}").map(|it| it.into());
+            let prompt = prompt!(&mut self.output, "Save as: {}")
+              .map(|it| it.into());
+
+            if let None = prompt {
+              self.output
+                .status_message
+                .set_message("Save aborted".into());
+              return Ok(true);
+            }
+            self.output.editor_rows.filename = prompt;
           }
           self.output.editor_rows.save()?;
           self.output.status_message.set_message("File saved.".to_string());
