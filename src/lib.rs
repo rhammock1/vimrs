@@ -82,7 +82,7 @@ impl Output {
       editor_contents: EditorContents::new(),
       editor_rows: EditorRows::new(),
       cursor_controller: CursorController::new(window_size),
-      status_message: StatusMessage::new("HELP: :q = Quit".into()),
+      status_message: StatusMessage::new("HELP: :w = Save | :q = Quit".into()),
     }
   }
   
@@ -485,11 +485,10 @@ impl EditorRows {
           .collect::<Vec<&str>>()
           .join("\n");
 
-        let size = contents.len() as u64;
+        let size = contents.as_bytes().len() as u64;
         file.set_len(size)?;
         self.file_size = Some(size);
         file.write_all(contents.as_bytes())
-
       }
     }
   }
