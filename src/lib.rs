@@ -12,6 +12,7 @@ struct Config {
   poll_timeout: Duration,
   spaces_per_tab: usize,
   message_timeout: u64,
+  max_new_filename_length: usize,
   // command_character: KeyCode,
 }
 
@@ -20,8 +21,54 @@ const CONFIG: Config = Config {
   poll_timeout: Duration::from_millis(1500),
   spaces_per_tab: 2,
   message_timeout: 5,
+  max_new_filename_length: 32,
   // command_character: KeyCode::Char(':'), // TODO- Actually use this
 };
+
+#[macro_export]
+macro_rules! prompt {
+  ($output:expr, $($args:tt)*) => {{
+    let output: &mut Output = &mut $output;
+    let mut input = String::with_capacity(CONFIG.max_new_filename_length);
+    loop {
+      output.status_message.set_message(format!($($args)*, input));
+      output.refresh_screen()?;
+      match Reader.read()? {
+        KeyEvent {
+          code: KeyCode::Enter,
+          modifiers: event::KeyModifiers::NONE,
+          ..
+        } => {
+          if !input.is_empty() {
+            output.status_message.set_message(String::new());
+            break;
+          }
+        },
+        KeyEvent {
+          code: KeyCode::Backspace,
+          modifiers: event::KeyModifiers::NONE,
+          ..
+        } => {
+          match input.pop() {
+            Some(_) => {},
+            None => {},
+          }
+        },
+        KeyEvent {
+          code: code @ (KeyCode::Char(..) | KeyCode::Tab),
+          modifiers: event::KeyModifiers::NONE | event::KeyModifiers::SHIFT,
+          ..
+        } => input.push(match code {
+          KeyCode::Tab => '\t',
+          KeyCode::Char(ch) => ch,
+          _ => unreachable!(),
+        }),
+        _ => {},
+      }
+    }
+    if input.is_empty() { None } else { Some(input) }
+  }};
+}
 
 /*  
 
@@ -399,6 +446,9 @@ impl Editor {
         log::log::log("INFO".to_string(), "Saving file.".to_string());
         // TODO- Check that a filename has been provided, if not, prompt for one
         if self.previous_3_keys.last() == Some(&KeyCode::Char(':')) {
+          if matches!(self.output.editor_rows.filename, None) {
+            self.output.editor_rows.filename = prompt!(&mut self.output, "Save as: {}").map(|it| it.into());
+          }
           self.output.editor_rows.save()?;
           self.output.status_message.set_message("File saved.".to_string());
           self.output.dirty = false;
