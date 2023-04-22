@@ -36,7 +36,7 @@ impl Output {
       editor_contents: EditorContents::new(),
       editor_rows: EditorRows::new(),
       cursor_controller: CursorController::new(window_size),
-      status_message: StatusMessage::new("HELP: :w = Save | :q = Quit".into()),
+      status_message: StatusMessage::new("HELP: :w = Save | :q = Quit | :f = Find".into()),
       dirty: false,
     }
   }
@@ -47,7 +47,7 @@ impl Output {
         let row = self.editor_rows.get_editor_row(i);
         if let Some(index) = row.render.find(&keyword) {
           self.cursor_controller.cursor_y = i;
-          self.cursor_controller.cursor_x = index;
+          self.cursor_controller.cursor_x = row.get_row_content_x(index);
           self.cursor_controller.row_offset = self.editor_rows.number_of_rows();
           break;
         }

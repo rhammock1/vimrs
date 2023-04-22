@@ -1,5 +1,5 @@
-use std::time;
-use crossterm::{event, terminal};
+use std::{io, time};
+use crossterm::{event, terminal, execute};
 use crossterm::event::{Event, KeyEvent};
 
 pub mod editor {
@@ -95,6 +95,7 @@ impl Drop for CleanUp {
   fn drop(&mut self) {
     log::log::log("INFO".to_string(), "Cleaning up.".to_string());
     terminal::disable_raw_mode().expect("Failed to disable RAW mode.");
+    execute!(io::stdout(), terminal::LeaveAlternateScreen).expect("Failed to leave alternate screen.");
     Output::clear_screen().expect("Failed to clear screen.");
   }
 }

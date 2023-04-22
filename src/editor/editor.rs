@@ -1,6 +1,6 @@
 use std::{cmp, io, env, fs, path::PathBuf, time::{Duration, Instant}};
 use std::io::Write;
-use crossterm::{event, terminal};
+use crossterm::{event, terminal, execute};
 use crossterm::event::{KeyCode, KeyEvent};
 use colored::{Colorize, ColoredString};
 
@@ -21,7 +21,9 @@ pub struct Editor {
 impl Editor {
   pub fn new() -> crossterm::Result<Self> {
     // Enable terminal's raw mode
-    terminal::enable_raw_mode()?;  
+    terminal::enable_raw_mode()?;
+    // Enter alternate screen
+    execute!(io::stdout(), terminal::EnterAlternateScreen)?;
     Ok(Self {
       reader: Reader,
       output: Output::new(),
@@ -92,6 +94,20 @@ impl Editor {
       } => {
         self.set_previous_key(KeyCode::Char(':'));
       },
+      KeyEvent {
+        code: KeyCode::Char('f'),
+        modifiers: event::KeyModifiers::NONE,
+        ..
+      } => {
+        log::log::log("INFO".to_string(), "Activating find mode.".to_string());
+        if self.previous_3_keys.last() == Some(&KeyCode::Char(':')) {
+          self.set_previous_key(KeyCode::Char('f'));
+          self.output.find()?;
+        } else {
+          self.set_previous_key(KeyCode::Char('f'));
+          self.output.insert_character('f')
+        }
+      }
       KeyEvent {
         code: KeyCode::Char('w'),
         modifiers: event::KeyModifiers::NONE,
@@ -248,6 +264,20 @@ impl Row {
       row_content,
       render,
     }
+  }
+
+  pub fn get_row_content_x(&self, render_x: usize) -> usize {
+    let mut current_render_x = 0;
+    for(cursor_x, character) in self.row_content.chars().enumerate() {
+      if character == '\t' {
+        current_render_x += (CONFIG.spaces_per_tab - 1) - (current_render_x % CONFIG.spaces_per_tab);
+      }
+      current_render_x += 1;
+      if current_render_x > render_x {
+        return cursor_x;
+      }
+    }
+    0
   }
 
   pub fn insert_character(&mut self, at: usize, character: char) {
