@@ -1,6 +1,6 @@
 use std::{cmp, io, env, fs, path::PathBuf, time::{Duration, Instant}};
 use std::io::Write;
-use crossterm::{event, terminal, execute};
+use crossterm::{event, terminal, queue};
 use crossterm::event::{KeyCode, KeyEvent};
 use colored::{Colorize, ColoredString};
 
@@ -23,7 +23,10 @@ impl Editor {
     // Enable terminal's raw mode
     terminal::enable_raw_mode()?;
     // Enter alternate screen
-    execute!(io::stdout(), terminal::EnterAlternateScreen)?;
+    queue!(
+      io::stdout(),
+      terminal::EnterAlternateScreen,
+    )?;
     Ok(Self {
       reader: Reader,
       output: Output::new(),

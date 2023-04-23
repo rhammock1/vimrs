@@ -3,6 +3,7 @@ use crossterm::event::KeyCode;
 use crate::editor::editor::{EditorRows, Row};
 use crate::CONFIG;
 
+#[derive(Copy, Clone)]
 pub struct CursorController {
   pub cursor_x: usize,
   pub cursor_y: usize,

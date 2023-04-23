@@ -41,17 +41,31 @@ impl Output {
     }
   }
 
-  pub fn find(&mut self) -> io::Result<()> {
-    if let Some(keyword) = prompt!(self, "Search: {} (ESC to cancel)") {
-      for i in 0..self.editor_rows.number_of_rows() {
-        let row = self.editor_rows.get_editor_row(i);
-        if let Some(index) = row.render.find(&keyword) {
-          self.cursor_controller.cursor_y = i;
-          self.cursor_controller.cursor_x = row.get_row_content_x(index);
-          self.cursor_controller.row_offset = self.editor_rows.number_of_rows();
-          break;
+  fn find_callback(output: &mut Output, keyword: &str, key_code: KeyCode) {
+    match key_code {
+      KeyCode::Enter | KeyCode::Esc => {},
+      _ => {
+        for i in 0..output.editor_rows.number_of_rows() {
+          let row = output.editor_rows.get_editor_row(i);
+          if let Some(index) = row.render.find(&keyword) {
+            output.cursor_controller.cursor_y = i;
+            output.cursor_controller.cursor_x = row.get_row_content_x(index);
+            output.cursor_controller.row_offset = output.editor_rows.number_of_rows();
+            break;
+          }
         }
       }
+    }
+  }
+
+  pub fn find(&mut self) -> io::Result<()> {
+    let cursor_controller = self.cursor_controller;
+    if prompt!(
+      self,
+      "Search: {} (ESC to cancel)",
+      callback = Output::find_callback
+    ).is_none() {
+      self.cursor_controller = cursor_controller;
     }
     Ok(())
   }

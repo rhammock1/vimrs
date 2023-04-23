@@ -1,5 +1,6 @@
 use std::{io, time};
-use crossterm::{event, terminal, execute};
+use std::io::Write;
+use crossterm::{event, terminal, queue};
 use crossterm::event::{Event, KeyEvent};
 
 pub mod editor {
@@ -31,13 +32,17 @@ pub const CONFIG: Config = Config {
 
 #[macro_export]
 macro_rules! prompt {
-  ($output:expr, $($args:tt)*) => {{
+  ($output:expr, $args:tt) => {
+    prompt!($output, $args, callback = |&_, _, _| {})
+  };
+  ($output:expr, $args:tt, callback = $callback:expr) => {{
     let output: &mut Output = $output;
     let mut input = String::with_capacity(CONFIG.max_new_filename_length);
     loop {
-      output.status_message.set_message(format!($($args)*, input));
+      output.status_message.set_message(format!($args, input));
       output.refresh_screen()?;
-      match Reader.read()? {
+      let key_event = Reader.read()?;
+      match key_event {
         KeyEvent {
           code: KeyCode::Enter,
           modifiers: event::KeyModifiers::NONE,
@@ -45,6 +50,7 @@ macro_rules! prompt {
         } => {
           if !input.is_empty() {
             output.status_message.set_message(String::new());
+            $callback(output, &input, KeyCode::Enter);
             break;
           }
         },
@@ -54,6 +60,7 @@ macro_rules! prompt {
         } => {
           output.status_message.set_message(String::new());
           input.clear();
+          $callback(output, &input, KeyCode::Esc);
           break;
         }
         KeyEvent {
@@ -77,6 +84,7 @@ macro_rules! prompt {
         }),
         _ => {},
       }
+      $callback(output, &input, key_event.code);
     }
     if input.is_empty() { None } else { Some(input) }
   }};
@@ -95,7 +103,7 @@ impl Drop for CleanUp {
   fn drop(&mut self) {
     log::log::log("INFO".to_string(), "Cleaning up.".to_string());
     terminal::disable_raw_mode().expect("Failed to disable RAW mode.");
-    execute!(io::stdout(), terminal::LeaveAlternateScreen).expect("Failed to leave alternate screen.");
+    queue!(io::stdout(), terminal::LeaveAlternateScreen).expect("Failed to leave alternate screen.");
     Output::clear_screen().expect("Failed to clear screen.");
   }
 }
