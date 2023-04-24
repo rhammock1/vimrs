@@ -322,6 +322,8 @@ impl Output {
           self.editor_contents.push('~');
         }
       } else {
+        let line_number = (file_row + 1) as u32;
+        self.editor_contents.push_str(format!("{:>3} ", line_number).as_str());
         let row = self.editor_rows.get_editor_row(file_row);
         let render = &row.render;
         let column_offset = self.cursor_controller.column_offset;

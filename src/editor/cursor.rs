@@ -30,7 +30,7 @@ impl CursorController {
   pub fn get_render_x(&self, row: &Row) -> usize {
     row.row_content[..self.cursor_x]
       .chars()
-      .fold(0, |render_x, c| {
+      .fold(4, |render_x, c| {
         if c == '\t' {
           render_x + (CONFIG.spaces_per_tab - 1) - (render_x % CONFIG.spaces_per_tab) + 1
         } else {
