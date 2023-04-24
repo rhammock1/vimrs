@@ -479,6 +479,9 @@ pub trait SyntaxHighlight {
     });
     let _ = queue!(out, style::ResetColor);
   }
+  fn is_separator(&self, c: char) -> bool {
+    c.is_whitespace() || ",.()+-/*=~%<>[]\"\';".contains(c)
+  }
 }
 
 #[macro_export]
@@ -507,14 +510,29 @@ macro_rules! syntax_struct {
         }
 
         current_row.highlight = Vec::with_capacity(current_row.render.len());
-        let characters = current_row.render.chars();
 
-        for c in characters {
-          if c.is_digit(10) {
+        let render = current_row.render.as_bytes();
+        let mut i = 0;
+        let mut previous_separater = true;
+
+        while i < render.len() {
+          let c = render[i] as char;
+          let previous_highlight = if i > 0 {
+            current_row.highlight[i - 1]
+          } else {
+            HighlightType::Normal
+          };
+          if c.is_digit(10)
+            && (previous_separater || matches!(previous_highlight, HighlightType::Number)) {
             add!(HighlightType::Number);
+            i += 1;
+            previous_separater = false;
+            continue;
           } else {
             add!(HighlightType::Normal);
           }
+          previous_separater = self.is_separator(c);
+          i += 1;
         }
         assert_eq!(current_row.render.len(), current_row.highlight.len())
       }
