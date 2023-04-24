@@ -255,9 +255,11 @@ impl io::Write for EditorContents {
   }
 }
 
+#[derive(Copy, Clone)]
 pub enum HighlightType {
   Normal,
   Number,
+  SearchMatch,
 }
 
 #[derive(Default)]
@@ -466,11 +468,16 @@ pub trait SyntaxHighlight {
   fn update_syntax(&self, at: usize, editor_rows: &mut Vec<Row>);
   fn syntax_color(&self, highlight_type: &HighlightType) -> style::Color;
   fn color_row(&self, render: &str, highlight: &[HighlightType], out: &mut EditorContents) {
-    render.chars().enumerate().for_each(|(i, c)| {
-      let _ = queue!(out, style::SetForegroundColor(self.syntax_color(&highlight[i])));
+    let mut current_color = self.syntax_color(&HighlightType::Normal);
+    render.char_indices().for_each(|(i, c)| {
+      let color = self.syntax_color(&highlight[i]);
+      if current_color != color {
+        current_color = color;
+        let _ = queue!(out, style::SetForegroundColor(color));
+      }
       out.push(c);
-      let _ = queue!(out, style::ResetColor);
     });
+    let _ = queue!(out, style::ResetColor);
   }
 }
 
@@ -486,6 +493,7 @@ macro_rules! syntax_struct {
         match highlight_type {
           HighlightType::Normal => style::Color::Reset,
           HighlightType::Number => style::Color::Cyan,
+          HighlightType::SearchMatch => style::Color::Blue,
         }
       }
 

@@ -57,6 +57,9 @@ impl Output {
   }
 
   fn find_callback(output: &mut Output, keyword: &str, key_code: KeyCode) {
+    if let Some((index, highlight)) = output.search_index.previous_highlight.take() {
+      output.editor_rows.get_editor_row_mut(index).highlight = highlight;
+    }
     match key_code {
       KeyCode::Enter | KeyCode::Esc => {
         output.search_index.reset();
@@ -102,7 +105,7 @@ impl Output {
           if row_index > output.editor_rows.number_of_rows() - 1 {
             break;
           }
-          let row = output.editor_rows.get_editor_row(row_index);
+          let row = output.editor_rows.get_editor_row_mut(row_index);
           let index = match output.search_index.x_direction.as_ref() {
             None => row.render.find(&keyword),
             Some(direction) => {
@@ -122,6 +125,13 @@ impl Output {
             }
           };
           if let Some(index) = index {
+            output.search_index.previous_highlight = Some((
+              row_index,
+              row.highlight.clone(),
+            ));
+            (index..index + keyword.len())
+              .for_each(|index| row.highlight[index] = HighlightType::SearchMatch);
+
             output.cursor_controller.cursor_y = row_index;
             output.search_index.y_index = row_index;
             output.search_index.x_index = index;
@@ -414,6 +424,7 @@ struct SearchIndex {
   y_index: usize,
   x_direction: Option<SearchDirection>,
   y_direction: Option<SearchDirection>,
+  previous_highlight: Option<(usize, Vec<HighlightType>)>,
 }
 
 impl SearchIndex {
@@ -423,6 +434,7 @@ impl SearchIndex {
       y_index: 0,
       x_direction: None,
       y_direction: None,
+      previous_highlight: None,
     }
   }
 
@@ -431,5 +443,6 @@ impl SearchIndex {
     self.y_index = 0;
     self.x_direction = None;
     self.y_direction = None;
+    self.previous_highlight = None;
   }
 }
