@@ -6,16 +6,25 @@ use crossterm::event::{KeyCode, KeyEvent};
 use crate::{
   log,
   prompt,
+  syntax_struct,
   CONFIG,
   Reader,
 };
 use super::{
   cursor::CursorController,
   editor::{
+    Row,
     EditorContents,
     EditorRows,
     StatusMessage,
-  }};
+    SyntaxHighlight,
+    HighlightType,
+  }
+};
+
+syntax_struct! {
+  struct RustHighlight;
+}
 
 pub struct Output {
   pub window_size: (usize, usize), // screen_columns: 0, screen_rows: 1
@@ -25,6 +34,7 @@ pub struct Output {
   pub status_message: StatusMessage,
   pub dirty: bool,
   search_index: SearchIndex,
+  syntax_highlight: Option<Box<dyn SyntaxHighlight>>,
 }
 
 impl Output {
@@ -32,14 +42,17 @@ impl Output {
     let window_size = terminal::size()
       .map(|(x, y)| (x as usize, y as usize - 2))
       .unwrap();
+
+    let syntax_highlight: Option<Box<dyn SyntaxHighlight>> = Some(Box::new(RustHighlight));
     Self {
       window_size,
       editor_contents: EditorContents::new(),
-      editor_rows: EditorRows::new(),
+      editor_rows: EditorRows::new(syntax_highlight.as_deref()),
       cursor_controller: CursorController::new(window_size),
       status_message: StatusMessage::new("HELP: :w = Save | :q = Quit | :f = Find".into()),
       dirty: false,
       search_index: SearchIndex::new(),
+      syntax_highlight,
     }
   }
 
@@ -153,6 +166,17 @@ impl Output {
       EditorRows::render_row(current_row);
       self.editor_rows
         .insert_row(self.cursor_controller.cursor_y + 1, new_row_content);
+
+      if let Some(it) = self.syntax_highlight.as_ref() {
+        it.update_syntax(
+          self.cursor_controller.cursor_y,
+          &mut self.editor_rows.row_contents,
+        );
+        it.update_syntax(
+          self.cursor_controller.cursor_y + 1,
+          &mut self.editor_rows.row_contents,
+        )
+      }
     }
     self.cursor_controller.cursor_x = 0;
     self.cursor_controller.cursor_y += 1;
@@ -168,6 +192,13 @@ impl Output {
     self.editor_rows
       .get_editor_row_mut(self.cursor_controller.cursor_y)
       .insert_character(self.cursor_controller.cursor_x, character);
+
+    if let Some(it) = self.syntax_highlight.as_ref() {
+      it.update_syntax(
+        self.cursor_controller.cursor_y,
+        &mut self.editor_rows.row_contents,
+      )
+    }
 
     self.cursor_controller.cursor_x += 1;
     self.dirty = true;
@@ -195,6 +226,16 @@ impl Output {
       self.editor_rows
         .join_adjacent_rows(self.cursor_controller.cursor_y);
       self.cursor_controller.cursor_y -= 1;
+    }
+    if let Some(it) = self.syntax_highlight.as_ref() {
+      it.update_syntax(
+        self.cursor_controller.cursor_y,
+        &mut self.editor_rows.row_contents,
+      );
+      it.update_syntax(
+        self.cursor_controller.cursor_y + 1,
+        &mut self.editor_rows.row_contents,
+      )
     }
     self.dirty = true;
   }
@@ -271,11 +312,23 @@ impl Output {
           self.editor_contents.push('~');
         }
       } else {
-        let row = self.editor_rows.get_render(file_row);
+        let row = self.editor_rows.get_editor_row(file_row);
+        let render = &row.render;
         let column_offset = self.cursor_controller.column_offset;
-        let len = cmp::min(row.len().saturating_sub(column_offset), screen_columns);
+        let len = cmp::min(render.len().saturating_sub(column_offset), screen_columns);
         let start = if len == 0 { 0 } else { column_offset };
-        self.editor_contents.push_str(&row[start..start + len]);
+
+        self.syntax_highlight
+          .as_ref()
+          .map(|syntax_highlight| {
+            syntax_highlight.color_row(
+              &render[start..start + len],
+              &row.highlight[start..start + len],
+              &mut self.editor_contents,
+            )
+          })
+          .unwrap_or_else(|| self.editor_contents.push_str(&render[start..start + len]));
+
       }
       queue!(
         self.editor_contents,

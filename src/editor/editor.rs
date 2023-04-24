@@ -1,6 +1,6 @@
 use std::{cmp, io, env, fs, path::PathBuf, time::{Duration, Instant}};
 use std::io::Write;
-use crossterm::{event, terminal, queue};
+use crossterm::{event, terminal, queue, style};
 use crossterm::event::{KeyCode, KeyEvent};
 use colored::{Colorize, ColoredString};
 
@@ -255,10 +255,16 @@ impl io::Write for EditorContents {
   }
 }
 
+pub enum HighlightType {
+  Normal,
+  Number,
+}
+
 #[derive(Default)]
 pub struct Row {
   pub row_content: String,
   pub render: String,
+  pub highlight: Vec<HighlightType>,
 }
 
 impl Row {
@@ -266,6 +272,7 @@ impl Row {
     Self {
       row_content,
       render,
+      highlight: Vec::new(),
     }
   }
 
@@ -301,7 +308,7 @@ pub struct EditorRows {
 }
 
 impl EditorRows {
-  pub fn new() -> Self {
+  pub fn new(syntax_highlight: Option<&dyn SyntaxHighlight>) -> Self {
     let mut arg = env::args();
     
     match arg.nth(1) {
@@ -310,7 +317,7 @@ impl EditorRows {
         filename: None,
         file_size: None,
       },
-      Some(file) => Self::from_file(file.into()),
+      Some(file) => Self::from_file(file.into(), syntax_highlight),
     }
   }
 
@@ -357,7 +364,7 @@ impl EditorRows {
     self.row_contents.insert(at, new_row);
   }
 
-  pub fn from_file(file: PathBuf) -> Self {
+  pub fn from_file(file: PathBuf, syntax_highlight: Option<&dyn SyntaxHighlight>) -> Self {
     // Create the file if it doesn't exist
     fs::OpenOptions::new()
       .write(true)
@@ -369,16 +376,18 @@ impl EditorRows {
     // Convert file_contents to string
     let file_contents = fs::read_to_string(&file).expect("Unable to read file.");
 
+    let mut row_contents = Vec::new();
+    file_contents.lines().enumerate().for_each(|(i, line)| {
+      let mut row = Row::new(line.into(), String::new());
+      Self::render_row(&mut row);
+      row_contents.push(row);
+      if let Some(it) = syntax_highlight {
+        it.update_syntax(i, &mut row_contents)
+      }
+    });
     Self {
       filename: Some(file),
-      row_contents: file_contents
-        .lines()
-        .map(|s| {
-          let mut row = Row::new(s.into(), String::new());
-          Self::render_row(&mut row);
-          row
-        })
-        .collect(),
+      row_contents,
       file_size: Some(file_contents.len() as u64),
     }
   }
@@ -451,4 +460,56 @@ impl StatusMessage {
         }
       })
   }
+}
+
+pub trait SyntaxHighlight {
+  fn update_syntax(&self, at: usize, editor_rows: &mut Vec<Row>);
+  fn syntax_color(&self, highlight_type: &HighlightType) -> style::Color;
+  fn color_row(&self, render: &str, highlight: &[HighlightType], out: &mut EditorContents) {
+    render.chars().enumerate().for_each(|(i, c)| {
+      let _ = queue!(out, style::SetForegroundColor(self.syntax_color(&highlight[i])));
+      out.push(c);
+      let _ = queue!(out, style::ResetColor);
+    });
+  }
+}
+
+#[macro_export]
+macro_rules! syntax_struct {
+  (
+    struct $Name:ident;
+  ) => {
+    struct $Name;
+
+    impl SyntaxHighlight for $Name {
+      fn syntax_color(&self, highlight_type: &HighlightType) -> style::Color {
+        match highlight_type {
+          HighlightType::Normal => style::Color::Reset,
+          HighlightType::Number => style::Color::Cyan,
+        }
+      }
+
+      fn update_syntax(&self, at: usize, editor_rows: &mut Vec<Row>) {
+        let current_row = &mut editor_rows[at];
+
+        macro_rules! add {
+          ($h:expr) => {
+            current_row.highlight.push($h);
+          };
+        }
+
+        current_row.highlight = Vec::with_capacity(current_row.render.len());
+        let characters = current_row.render.chars();
+
+        for c in characters {
+          if c.is_digit(10) {
+            add!(HighlightType::Number);
+          } else {
+            add!(HighlightType::Normal);
+          }
+        }
+        assert_eq!(current_row.render.len(), current_row.highlight.len())
+      }
+    }
+  };
 }
