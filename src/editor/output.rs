@@ -2,6 +2,7 @@ use std::{io, cmp};
 use std::io::Write;
 use crossterm::{cursor, event, execute, terminal, queue, style};
 use crossterm::event::{KeyCode, KeyEvent};
+use colored::Colorize;
 
 use crate::{
   log,
@@ -300,11 +301,11 @@ impl Output {
           }
           let mut welcome_padding = (screen_columns - welcome.len()) / 2;
           if welcome_padding != 0 {
-            self.editor_contents.push('~');
+            self.editor_contents.push_str("~", Some(CONFIG.tilde_color.to_string()));
             welcome_padding -= 1;
           }
           (0..welcome_padding).for_each(|_| self.editor_contents.push(' '));
-          self.editor_contents.push_str(&welcome);
+          self.editor_contents.push_str(&welcome, None);
 
           let mut description = String::from("A text editor written in Rust\r\n");
           if description.len() > screen_columns {
@@ -312,18 +313,27 @@ impl Output {
           }
           let mut description_padding = (screen_columns - description.len()) / 2;
           if description_padding != 0 {
-            self.editor_contents.push('~');
+            self.editor_contents.push_str("~", Some(CONFIG.tilde_color.to_string()));
             description_padding -= 1;
           }
           (0..description_padding).for_each(|_| self.editor_contents.push(' '));
-          self.editor_contents.push_str(&description);
-          self.editor_contents.push('~');
+          self.editor_contents.push_str(&description, None);
+          self.editor_contents.push_str("~", Some(CONFIG.tilde_color.to_string()));
         } else {
-          self.editor_contents.push('~');
+          // TODO- Figure out the best way to handle this
+          // Should the push_str function signature be changed to accept a color string
+          // Or should the color be set before the push call
+          // execute!(
+          //   io::stdout(),
+          //   style::SetForegroundColor(style::Color::Magenta),
+          // );
+          // self.editor_contents.push('~');
+          // execute!(io::stdout(), style::ResetColor);
+          self.editor_contents.push_str("~", Some(CONFIG.tilde_color.to_string()));
         }
       } else {
         let line_number = (file_row + 1) as u32;
-        self.editor_contents.push_str(format!("{:>3} ", line_number).as_str());
+        self.editor_contents.push_str(format!("{:>3} ", line_number).as_str(), Some(CONFIG.line_number_color.to_string()));
         let row = self.editor_rows.get_editor_row(file_row);
         let render = &row.render;
         let column_offset = self.cursor_controller.column_offset;
@@ -339,7 +349,7 @@ impl Output {
               &mut self.editor_contents,
             )
           })
-          .unwrap_or_else(|| self.editor_contents.push_str(&render[start..start + len]));
+          .unwrap_or_else(|| self.editor_contents.push_str(&render[start..start + len], None));
 
       }
       queue!(
@@ -347,7 +357,7 @@ impl Output {
         terminal::Clear(terminal::ClearType::UntilNewLine),
       ).unwrap();
 
-      self.editor_contents.push_str("\r\n");
+      self.editor_contents.push_str("\r\n", None);
     }
   }
 
@@ -358,7 +368,7 @@ impl Output {
   pub fn draw_status_bar(&mut self) {
     // Invert color
     self.editor_contents
-      .push_str(&style::Attribute::Reverse.to_string());
+      .push_str(&style::Attribute::Reverse.to_string(), None);
 
     let info = format!(
       // Name, number of lines, size in bytes
@@ -385,11 +395,11 @@ impl Output {
       self.cursor_controller.cursor_x + 1,
     );
 
-    self.editor_contents.push_str(&info[..info_length]);
+    self.editor_contents.push_str(&info[..info_length], None);
 
     for i in info_length..self.window_size.0 {
       if self.window_size.0 - i == line_info.len() {
-        self.editor_contents.push_str(&line_info);
+        self.editor_contents.push_str(&line_info, None);
         break;
       } else {
         self.editor_contents.push(' ');
@@ -398,9 +408,9 @@ impl Output {
         
     // Reset color
     self.editor_contents
-      .push_str(&style::Attribute::Reset.to_string());
+      .push_str(&style::Attribute::Reset.to_string(), None);
 
-    self.editor_contents.push_str("\r\n");
+    self.editor_contents.push_str("\r\n", None);
   }
 
   pub fn draw_message_bar(&mut self) {
@@ -411,7 +421,7 @@ impl Output {
 
     if let Some(msg) = self.status_message.message() {
       self.editor_contents
-        .push_str(&msg[..cmp::min(self.window_size.0, msg.len())]);
+        .push_str(&msg[..cmp::min(self.window_size.0, msg.len())], None);
     }
   }
 }

@@ -18,6 +18,8 @@ pub struct Config {
   pub spaces_per_tab: usize,
   pub message_timeout: u64,
   pub max_new_filename_length: usize,
+  pub line_number_color: &'static str,
+  pub tilde_color: &'static str,
   // command_character: KeyCode,
 }
 
@@ -27,6 +29,8 @@ pub const CONFIG: Config = Config {
   spaces_per_tab: 2,
   message_timeout: 5,
   max_new_filename_length: 32,
+  line_number_color: "red",
+  tilde_color: "purple",
   // command_character: KeyCode::Char(':'), // TODO- Actually use this
 };
 
