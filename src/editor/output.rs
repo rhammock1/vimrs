@@ -224,7 +224,6 @@ impl Output {
     }
     let row = self.editor_rows
       .get_editor_row_mut(self.cursor_controller.cursor_y);
-
     if self.cursor_controller.cursor_x > 0 {
       row.delete_character(self.cursor_controller.cursor_x - 1);
       self.cursor_controller.cursor_x -= 1;
@@ -243,10 +242,11 @@ impl Output {
         self.cursor_controller.cursor_y,
         &mut self.editor_rows.row_contents,
       );
-      it.update_syntax(
-        self.cursor_controller.cursor_y + 1,
-        &mut self.editor_rows.row_contents,
-      )
+      // This block is causing a panic because the index equals the length of the row_contents (or something like that)
+      // it.update_syntax(
+      //   self.cursor_controller.cursor_y + 1,
+      //   &mut self.editor_rows.row_contents,
+      // )
     }
     self.dirty = true;
   }
@@ -288,8 +288,6 @@ impl Output {
   pub fn draw_rows(&mut self) {
     let screen_columns = self.window_size.0;
     let screen_rows = self.window_size.1;
-
-    log::log::log("INFO".to_string(), format!("Drawing rows. Screen columns: {}, screen rows: {}", screen_columns, screen_rows));
 
     for i in 0..screen_rows {
       let file_row = i + self.cursor_controller.row_offset;

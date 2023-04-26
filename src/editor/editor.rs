@@ -232,7 +232,11 @@ impl EditorContents {
   }
 
   pub fn push_str(&mut self, string: &str, str_color: Option<String>) {
-    self.content.push_str(string.color(str_color.unwrap_or(String::from("normal"))).to_string().as_str())
+    self.content.push_str(
+      string.color(
+        str_color.unwrap_or(String::from("normal")
+      )
+    ).to_string().as_str())
   }
 }
 
@@ -522,8 +526,10 @@ macro_rules! syntax_struct {
           } else {
             HighlightType::Normal
           };
-          if c.is_digit(10)
-            && (previous_separater || matches!(previous_highlight, HighlightType::Number)) {
+          if (c.is_digit(10)
+            && (previous_separater 
+              || matches!(previous_highlight, HighlightType::Number)))
+            || (c == '.' && matches!(previous_highlight, HighlightType::Number)) {
             add!(HighlightType::Number);
             i += 1;
             previous_separater = false;
