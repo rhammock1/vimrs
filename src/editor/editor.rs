@@ -123,12 +123,25 @@ impl Editor {
             let prompt = prompt!(&mut self.output, "Save as: {}")
               .map(|it| it.into());
 
-            if let None = prompt {
+            if prompt.is_none() {
               self.output
                 .status_message
                 .set_message("Save aborted".into());
               return Ok(true);
             }
+            prompt
+              .as_ref()
+              .and_then(|path: &PathBuf| path.extension())
+              .and_then(|ext| ext.to_str())
+              .map(|ext| {
+                Output::select_syntax(ext).map(|syntax| {
+                  let highlight = self.output.syntax_highlight.insert(syntax);
+                  for i in 0..self.output.editor_rows.number_of_rows() {
+                    highlight
+                      .update_syntax(i, &mut self.output.editor_rows.row_contents)
+                  }
+                })
+              });
             self.output.editor_rows.filename = prompt;
           }
           self.output.editor_rows.save()?;
@@ -264,6 +277,9 @@ pub enum HighlightType {
   Normal,
   Number,
   SearchMatch,
+  String,
+  CharLiteral,
+  Comment,
 }
 
 #[derive(Default)]
@@ -314,10 +330,9 @@ pub struct EditorRows {
 }
 
 impl EditorRows {
-  pub fn new(syntax_highlight: Option<&dyn SyntaxHighlight>) -> Self {
-    let mut arg = env::args();
+  pub fn new(syntax_highlight: &mut Option<Box<dyn SyntaxHighlight>>) -> Self {
     
-    match arg.nth(1) {
+    match env::args().nth(1) {
       None => Self {
         row_contents: Vec::new(),
         filename: None,
@@ -370,7 +385,7 @@ impl EditorRows {
     self.row_contents.insert(at, new_row);
   }
 
-  pub fn from_file(file: PathBuf, syntax_highlight: Option<&dyn SyntaxHighlight>) -> Self {
+  pub fn from_file(file: PathBuf, syntax_highlight: &mut Option<Box<dyn SyntaxHighlight>>) -> Self {
     // Create the file if it doesn't exist
     fs::OpenOptions::new()
       .write(true)
@@ -378,6 +393,10 @@ impl EditorRows {
       .read(true)
       .open(&file)
       .expect("Unable to create file.");
+
+    file.extension()
+      .and_then(|ext| ext.to_str())
+      .map(|ext| Output::select_syntax(ext).map(|syntax| syntax_highlight.insert(syntax)));
 
     // Convert file_contents to string
     let file_contents = fs::read_to_string(&file).expect("Unable to read file.");
@@ -469,6 +488,8 @@ impl StatusMessage {
 }
 
 pub trait SyntaxHighlight {
+  fn extensions(&self) -> &[&str];
+  fn file_type(&self) -> &str;
   fn update_syntax(&self, at: usize, editor_rows: &mut Vec<Row>);
   fn syntax_color(&self, highlight_type: &HighlightType) -> style::Color;
   fn color_row(&self, render: &str, highlight: &[HighlightType], out: &mut EditorContents) {
@@ -491,16 +512,42 @@ pub trait SyntaxHighlight {
 #[macro_export]
 macro_rules! syntax_struct {
   (
-    struct $Name:ident;
+    struct $Name:ident {
+      extensions: $ext:expr,
+      file_type: $type:expr,
+    }
   ) => {
-    struct $Name;
+    struct $Name {
+      extensions: &'static [&'static str],
+      file_type: &'static str,
+    }
+
+    impl $Name {
+      fn new() -> Self {
+        Self {
+          extensions: &$ext,
+          file_type: $type,
+        }
+      }
+    }
 
     impl SyntaxHighlight for $Name {
+      fn extensions(&self) -> &[&str] {
+        self.extensions
+      }
+
+      fn file_type(&self) -> &str {
+        self.file_type
+      }
+
       fn syntax_color(&self, highlight_type: &HighlightType) -> style::Color {
         match highlight_type {
           HighlightType::Normal => style::Color::Reset,
           HighlightType::Number => style::Color::Cyan,
           HighlightType::SearchMatch => style::Color::Blue,
+          HighlightType::String => style::Color::Green,
+          HighlightType::Comment => style::Color::Grey,
+          HighlightType::CharLiteral => style::Color::DarkGreen,
         }
       }
 
@@ -518,6 +565,7 @@ macro_rules! syntax_struct {
         let render = current_row.render.as_bytes();
         let mut i = 0;
         let mut previous_separater = true;
+        let mut in_string: Option<char> = None;
 
         while i < render.len() {
           let c = render[i] as char;
@@ -526,6 +574,29 @@ macro_rules! syntax_struct {
           } else {
             HighlightType::Normal
           };
+          if let Some(val) = in_string {
+            add! {
+              if val == '"' { HighlightType::String } else { HighlightType::CharLiteral }
+            }
+            if c == '\\' && i + 1 < render.len() {
+              add! {
+                if val == '"' { HighlightType::String } else { HighlightType::CharLiteral }
+              }
+              i += 2;
+              continue;
+            }
+            if val == c {
+              in_string = None;
+            }
+            i += 1;
+            previous_separater = true;
+            continue;
+          } else if c == '"' || c == '\'' {
+            in_string = Some(c);
+            add! {
+              if c == '"' { HighlightType::String } else { HighlightType::CharLiteral }
+            }
+          }
           if (c.is_digit(10)
             && (previous_separater 
               || matches!(previous_highlight, HighlightType::Number)))

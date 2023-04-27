@@ -24,7 +24,10 @@ use super::{
 };
 
 syntax_struct! {
-  struct RustHighlight;
+  struct RustHighlight {
+    extensions: ["rs"],
+    file_type: "Rust",
+  }
 }
 
 pub struct Output {
@@ -35,7 +38,7 @@ pub struct Output {
   pub status_message: StatusMessage,
   pub dirty: bool,
   search_index: SearchIndex,
-  syntax_highlight: Option<Box<dyn SyntaxHighlight>>,
+  pub syntax_highlight: Option<Box<dyn SyntaxHighlight>>,
 }
 
 impl Output {
@@ -44,17 +47,23 @@ impl Output {
       .map(|(x, y)| (x as usize, y as usize - 2))
       .unwrap();
 
-    let syntax_highlight: Option<Box<dyn SyntaxHighlight>> = Some(Box::new(RustHighlight));
+    let mut syntax_highlight = None;
     Self {
       window_size,
       editor_contents: EditorContents::new(),
-      editor_rows: EditorRows::new(syntax_highlight.as_deref()),
+      editor_rows: EditorRows::new(&mut syntax_highlight),
       cursor_controller: CursorController::new(window_size),
       status_message: StatusMessage::new("HELP: :w = Save | :q = Quit | :f = Find".into()),
       dirty: false,
       search_index: SearchIndex::new(),
       syntax_highlight,
     }
+  }
+
+  pub fn select_syntax(extension: &str) -> Option<Box<dyn SyntaxHighlight>> {
+    let list: Vec<Box<dyn SyntaxHighlight>> = vec![Box::new(RustHighlight::new())];
+    list.into_iter()
+      .find(|it| it.extensions().contains(&extension))
   }
 
   fn find_callback(output: &mut Output, keyword: &str, key_code: KeyCode) {
@@ -388,7 +397,11 @@ impl Output {
     let info_length = cmp::min(info.len(), self.window_size.0);
 
     let line_info = format!(
-      "Ln {}, Col {}",
+      "{}, Ln {}, Col {}",
+      self.syntax_highlight
+        .as_ref()
+        .map(|highlight| highlight.file_type())
+        .unwrap_or("no ft"),
       self.cursor_controller.cursor_y + 1,
       self.cursor_controller.cursor_x + 1,
     );
