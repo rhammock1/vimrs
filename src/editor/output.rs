@@ -27,6 +27,19 @@ syntax_struct! {
   struct RustHighlight {
     extensions: ["rs"],
     file_type: "Rust",
+    comment_start:"//",
+    keywords: {
+      [style::Color::Yellow;
+        "mod", "unsafe", "extern", "crate", "use", "type", "struct", "enum", "union", "const", "static",
+        "mut", "let", "if", "else", "impl", "trait", "for", "fn", "self", "Self", "while", "true", "false",
+        "in", "continue", "break", "loop", "match"
+      ],
+      [style::Color::Reset;
+        "isize", "i8", "i16", "i32", "i64", "usize",
+        "u8", "u16", "u32", "u64", "f32", "f64",
+        "char", "str", "bool"
+      ]
+    },
   }
 }
 

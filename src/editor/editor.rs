@@ -280,6 +280,7 @@ pub enum HighlightType {
   String,
   CharLiteral,
   Comment,
+  Other (style::Color),
 }
 
 #[derive(Default)]
@@ -490,6 +491,7 @@ impl StatusMessage {
 pub trait SyntaxHighlight {
   fn extensions(&self) -> &[&str];
   fn file_type(&self) -> &str;
+  fn comment_start(&self) -> &str;
   fn update_syntax(&self, at: usize, editor_rows: &mut Vec<Row>);
   fn syntax_color(&self, highlight_type: &HighlightType) -> style::Color;
   fn color_row(&self, render: &str, highlight: &[HighlightType], out: &mut EditorContents) {
@@ -505,7 +507,9 @@ pub trait SyntaxHighlight {
     let _ = queue!(out, style::ResetColor);
   }
   fn is_separator(&self, c: char) -> bool {
-    c.is_whitespace() || ",.()+-/*=~%<>[]\"\';".contains(c)
+    c.is_whitespace() || [
+      ',', '.', '(', ')', '+', '-', '/', '*', '=', '~', '%', '<', '>', '"', '\'', ';', '&',
+    ].contains(&c)
   }
 }
 
@@ -515,11 +519,16 @@ macro_rules! syntax_struct {
     struct $Name:ident {
       extensions: $ext:expr,
       file_type: $type:expr,
+      comment_start: $start:expr,
+      keywords: {
+        $([$color:expr; $($words:expr),*]),*
+      },
     }
   ) => {
     struct $Name {
       extensions: &'static [&'static str],
       file_type: &'static str,
+      comment_start: &'static str,
     }
 
     impl $Name {
@@ -527,6 +536,7 @@ macro_rules! syntax_struct {
         Self {
           extensions: &$ext,
           file_type: $type,
+          comment_start: $start,
         }
       }
     }
@@ -540,14 +550,19 @@ macro_rules! syntax_struct {
         self.file_type
       }
 
+      fn comment_start(&self) -> &str {
+        self.comment_start
+      }
+
       fn syntax_color(&self, highlight_type: &HighlightType) -> style::Color {
         match highlight_type {
           HighlightType::Normal => style::Color::Reset,
           HighlightType::Number => style::Color::Cyan,
           HighlightType::SearchMatch => style::Color::Blue,
           HighlightType::String => style::Color::Green,
-          HighlightType::Comment => style::Color::Grey,
+          HighlightType::Comment => style::Color::DarkGrey,
           HighlightType::CharLiteral => style::Color::DarkGreen,
+          HighlightType::Other(color) => *color,
         }
       }
 
@@ -556,7 +571,7 @@ macro_rules! syntax_struct {
 
         macro_rules! add {
           ($h:expr) => {
-            current_row.highlight.push($h);
+            current_row.highlight.push($h)
           };
         }
 
@@ -566,6 +581,7 @@ macro_rules! syntax_struct {
         let mut i = 0;
         let mut previous_separater = true;
         let mut in_string: Option<char> = None;
+        let comment_start = self.comment_start().as_bytes();
 
         while i < render.len() {
           let c = render[i] as char;
@@ -574,6 +590,13 @@ macro_rules! syntax_struct {
           } else {
             HighlightType::Normal
           };
+          if in_string.is_none() && !comment_start.is_empty() {
+            let end = i + comment_start.len();
+            if render[i..cmp::min(end, render.len())] == *comment_start {
+              (i..render.len()).for_each(|_| add!(HighlightType::Comment));
+              break;
+            }
+          }
           if let Some(val) = in_string {
             add! {
               if val == '"' { HighlightType::String } else { HighlightType::CharLiteral }
@@ -605,9 +628,25 @@ macro_rules! syntax_struct {
             i += 1;
             previous_separater = false;
             continue;
-          } else {
-            add!(HighlightType::Normal);
           }
+          if previous_separater {
+            $(
+              $(
+                let end = i + $words.len();
+                let is_end_or_sep = render
+                  .get(end)
+                  .map(|c| self.is_separator(*c as char))
+                  .unwrap_or(end == render.len());
+                if is_end_or_sep && render[i..end] == *$words.as_bytes() {
+                  (i..i + $words.len()).for_each(|_| add!(HighlightType::Other($color)));
+                  i += $words.len();
+                  previous_separater = false;
+                  continue;
+                }
+              )*
+            )*
+          }
+          add!(HighlightType::Normal);
           previous_separater = self.is_separator(c);
           i += 1;
         }
