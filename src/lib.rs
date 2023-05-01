@@ -1,5 +1,4 @@
 use std::{io, time};
-use std::io::Write;
 use crossterm::{event, terminal, queue};
 use crossterm::event::{Event, KeyEvent};
 
@@ -7,6 +6,7 @@ pub mod editor {
   pub mod output;
   pub mod cursor;
   pub mod editor;
+  pub mod syntax;
 }
 mod log;
 

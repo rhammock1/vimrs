@@ -530,7 +530,7 @@ macro_rules! syntax_struct {
       multiline_comment:$ml_comment:expr
     }
   ) => {
-    struct $Name {
+    pub struct $Name {
       extensions: &'static [&'static str],
       file_type: &'static str,
       comment_start: &'static str,
@@ -538,7 +538,7 @@ macro_rules! syntax_struct {
     }
 
     impl $Name {
-      fn new() -> Self {
+      pub fn new() -> Self {
         Self {
           extensions: &$ext,
           file_type: $type,
