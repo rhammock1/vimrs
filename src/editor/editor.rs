@@ -280,6 +280,7 @@ pub enum HighlightType {
   String,
   CharLiteral,
   Comment,
+  MultilineComment,
   Other (style::Color),
 }
 
@@ -492,6 +493,7 @@ pub trait SyntaxHighlight {
   fn extensions(&self) -> &[&str];
   fn file_type(&self) -> &str;
   fn comment_start(&self) -> &str;
+  fn multiline_comment(&self) -> Option<(&str, &str)>;
   fn update_syntax(&self, at: usize, editor_rows: &mut Vec<Row>);
   fn syntax_color(&self, highlight_type: &HighlightType) -> style::Color;
   fn color_row(&self, render: &str, highlight: &[HighlightType], out: &mut EditorContents) {
@@ -523,12 +525,14 @@ macro_rules! syntax_struct {
       keywords: {
         $([$color:expr; $($words:expr),*]),*
       },
+      multiline_comment:$ml_comment:expr
     }
   ) => {
     struct $Name {
       extensions: &'static [&'static str],
       file_type: &'static str,
       comment_start: &'static str,
+      multiline_comment: Option<(&'static str, &'static str)>,
     }
 
     impl $Name {
@@ -537,6 +541,7 @@ macro_rules! syntax_struct {
           extensions: &$ext,
           file_type: $type,
           comment_start: $start,
+          multiline_comment: $ml_comment,
         }
       }
     }
@@ -554,13 +559,17 @@ macro_rules! syntax_struct {
         self.comment_start
       }
 
+      fn multiline_comment(&self) -> Option<(&str, &str)> {
+        self.multiline_comment
+      }
+
       fn syntax_color(&self, highlight_type: &HighlightType) -> style::Color {
         match highlight_type {
           HighlightType::Normal => style::Color::Reset,
           HighlightType::Number => style::Color::Cyan,
           HighlightType::SearchMatch => style::Color::Blue,
           HighlightType::String => style::Color::Green,
-          HighlightType::Comment => style::Color::DarkGrey,
+          HighlightType::Comment | HighlightType::MultilineComment => style::Color::DarkGrey,
           HighlightType::CharLiteral => style::Color::DarkGreen,
           HighlightType::Other(color) => *color,
         }
@@ -582,6 +591,7 @@ macro_rules! syntax_struct {
         let mut previous_separater = true;
         let mut in_string: Option<char> = None;
         let comment_start = self.comment_start().as_bytes();
+        let mut in_comment = false;
 
         while i < render.len() {
           let c = render[i] as char;
@@ -590,13 +600,42 @@ macro_rules! syntax_struct {
           } else {
             HighlightType::Normal
           };
-          if in_string.is_none() && !comment_start.is_empty() {
+
+          if in_string.is_none() && !comment_start.is_empty() && !in_comment {
             let end = i + comment_start.len();
             if render[i..cmp::min(end, render.len())] == *comment_start {
               (i..render.len()).for_each(|_| add!(HighlightType::Comment));
               break;
             }
           }
+
+          if let Some(val) = $ml_comment {
+            if in_string.is_none() {
+              if in_comment {
+                add!(HighlightType::MultilineComment);
+                let end = i + val.1.len();
+                if render[i..cmp::min(render.len(), end)] == *val.1.as_bytes() {
+                  (0..val.1.len().saturating_sub(1)).for_each(|_| add!(HighlightType::MultilineComment));
+                  i += val.1.len();
+                  previous_separater = true;
+                  in_comment = false;
+                  continue;
+                } else {
+                  i += 1;
+                  continue;
+                }
+              } else {
+                let end = i + val.0.len();
+                if render[i..cmp::min(render.len(), end)] == *val.0.as_bytes() {
+                  (i..end).for_each(|_| add!(HighlightType::MultilineComment));
+                  i += val.0.len();
+                  in_comment = true;
+                  continue;
+                }
+              }
+            }
+          }
+
           if let Some(val) = in_string {
             add! {
               if val == '"' { HighlightType::String } else { HighlightType::CharLiteral }
@@ -620,6 +659,7 @@ macro_rules! syntax_struct {
               if c == '"' { HighlightType::String } else { HighlightType::CharLiteral }
             }
           }
+
           if (c.is_digit(10)
             && (previous_separater 
               || matches!(previous_highlight, HighlightType::Number)))

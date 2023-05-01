@@ -40,6 +40,17 @@ syntax_struct! {
         "char", "str", "bool"
       ]
     },
+    multiline_comment: Some(("/*", "*/"))
+  }
+}
+
+syntax_struct! {
+  struct PlainTextHighlight {
+    extensions: ["txt"],
+    file_type: "Plain Text",
+    comment_start: "~",
+    keywords: {},
+    multiline_comment: None::<(&'static str, &'static str)>
   }
 }
 
@@ -74,7 +85,7 @@ impl Output {
   }
 
   pub fn select_syntax(extension: &str) -> Option<Box<dyn SyntaxHighlight>> {
-    let list: Vec<Box<dyn SyntaxHighlight>> = vec![Box::new(RustHighlight::new())];
+    let list: Vec<Box<dyn SyntaxHighlight>> = vec![Box::new(RustHighlight::new()), Box::new(PlainTextHighlight::new())];
     list.into_iter()
       .find(|it| it.extensions().contains(&extension))
   }
