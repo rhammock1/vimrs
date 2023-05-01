@@ -16,13 +16,13 @@ use super::{
     EditorContents,
     EditorRows,
     StatusMessage,
-    SyntaxHighlight,
-    HighlightType,
   },
   syntax::{
     RustHighlight,
     PlainTextHighlight,
     JavaScriptHighlight,
+    HighlightType,
+    SyntaxHighlight,
   },
 };
 
