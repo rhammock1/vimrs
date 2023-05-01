@@ -171,13 +171,24 @@ impl Output {
       self.editor_rows
         .insert_row(self.cursor_controller.cursor_y, String::new())
     } else {
+      let indent = " ".repeat(
+        self
+          .editor_rows
+          .get_editor_row(self.cursor_controller.cursor_y)
+          .indent()
+        );
+
       let current_row = self
         .editor_rows
         .get_editor_row_mut(self.cursor_controller.cursor_y);
 
-      let new_row_content = current_row
+      let new_row_content: String = current_row
         .row_content[self.cursor_controller.cursor_x..]
         .into();
+
+      let indented_new_row_content = format!("{}{}", indent, new_row_content);
+
+      log::log::log("INFO".to_string(), format!("new_row_content: {}", indented_new_row_content));
 
       current_row
         .row_content
@@ -185,7 +196,7 @@ impl Output {
 
       EditorRows::render_row(current_row);
       self.editor_rows
-        .insert_row(self.cursor_controller.cursor_y + 1, new_row_content);
+        .insert_row(self.cursor_controller.cursor_y + 1, indented_new_row_content);
 
       if let Some(it) = self.syntax_highlight.as_ref() {
         it.update_syntax(
@@ -198,7 +209,10 @@ impl Output {
         )
       }
     }
-    self.cursor_controller.cursor_x = 0;
+    self.cursor_controller.cursor_x = self
+      .editor_rows
+      .get_editor_row(self.cursor_controller.cursor_y)
+      .indent();
     self.cursor_controller.cursor_y += 1;
     self.dirty = true;
   }

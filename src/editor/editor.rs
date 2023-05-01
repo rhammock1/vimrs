@@ -296,6 +296,21 @@ impl Row {
     }
   }
 
+  pub fn indent(&self) -> usize {
+    // Get the number of spaces at the beginning of row_contents
+    let mut indent = 0;
+    for character in self.row_content.chars() {
+      if character == ' ' {
+        indent += 1;
+      } else if character == '\t' {
+        indent += CONFIG.spaces_per_tab;
+      } else {
+        break;
+      }
+    }
+    indent
+  }
+
   pub fn get_row_content_x(&self, render_x: usize) -> usize {
     let mut current_render_x = 0;
     for(cursor_x, character) in self.row_content.chars().enumerate() {
