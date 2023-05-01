@@ -54,6 +54,27 @@ syntax_struct! {
   }
 }
 
+syntax_struct! {
+  struct JavaScriptHighlight {
+    extensions: ["js"],
+    file_type: "JavaScript",
+    comment_start: "//",
+    keywords: {
+      [style::Color::Yellow;
+        "const", "static",
+        "let", "if", "else", "for", "function", "self", "Self", "while", "true", "false",
+        "in", "continue", "break", "loop", "match"
+      ],
+      [style::Color::Reset;
+        "isize", "i8", "i16", "i32", "i64", "usize",
+        "u8", "u16", "u32", "u64", "f32", "f64",
+        "char", "str", "bool"
+      ]
+    },
+    multiline_comment:Some(("/*", "*/"))
+  }
+}
+
 pub struct Output {
   pub window_size: (usize, usize), // screen_columns: 0, screen_rows: 1
   pub editor_contents: EditorContents,
@@ -85,7 +106,11 @@ impl Output {
   }
 
   pub fn select_syntax(extension: &str) -> Option<Box<dyn SyntaxHighlight>> {
-    let list: Vec<Box<dyn SyntaxHighlight>> = vec![Box::new(RustHighlight::new()), Box::new(PlainTextHighlight::new())];
+    let list: Vec<Box<dyn SyntaxHighlight>> = vec![
+      Box::new(RustHighlight::new()),
+      Box::new(PlainTextHighlight::new()),
+      Box::new(JavaScriptHighlight::new())
+    ];
     list.into_iter()
       .find(|it| it.extensions().contains(&extension))
   }

@@ -289,6 +289,7 @@ pub struct Row {
   pub row_content: String,
   pub render: String,
   pub highlight: Vec<HighlightType>,
+  pub is_comment: bool,
 }
 
 impl Row {
@@ -297,6 +298,7 @@ impl Row {
       row_content,
       render,
       highlight: Vec::new(),
+      is_comment: false,
     }
   }
 
@@ -576,6 +578,7 @@ macro_rules! syntax_struct {
       }
 
       fn update_syntax(&self, at: usize, editor_rows: &mut Vec<Row>) {
+        let mut in_comment = at > 0 && editor_rows[at - 1].is_comment;
         let current_row = &mut editor_rows[at];
 
         macro_rules! add {
@@ -591,7 +594,6 @@ macro_rules! syntax_struct {
         let mut previous_separater = true;
         let mut in_string: Option<char> = None;
         let comment_start = self.comment_start().as_bytes();
-        let mut in_comment = false;
 
         while i < render.len() {
           let c = render[i] as char;
@@ -616,7 +618,7 @@ macro_rules! syntax_struct {
                 let end = i + val.1.len();
                 if render[i..cmp::min(render.len(), end)] == *val.1.as_bytes() {
                   (0..val.1.len().saturating_sub(1)).for_each(|_| add!(HighlightType::MultilineComment));
-                  i += val.1.len();
+                  i = end;
                   previous_separater = true;
                   in_comment = false;
                   continue;
@@ -658,6 +660,8 @@ macro_rules! syntax_struct {
             add! {
               if c == '"' { HighlightType::String } else { HighlightType::CharLiteral }
             }
+            i += 1;
+            continue;
           }
 
           if (c.is_digit(10)
@@ -690,7 +694,13 @@ macro_rules! syntax_struct {
           previous_separater = self.is_separator(c);
           i += 1;
         }
-        assert_eq!(current_row.render.len(), current_row.highlight.len())
+        log::log::log("INFO".to_string(), format!("{} : {}", current_row.render.len(), current_row.highlight.len()));
+        assert_eq!(current_row.render.len(), current_row.highlight.len());
+        let changed = current_row.is_comment != in_comment;
+        current_row.is_comment = in_comment;
+        if (changed && at + 1 < editor_rows.len()) {
+          self.update_syntax(at + 1, editor_rows)
+        }
       }
     }
   };
