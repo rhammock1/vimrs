@@ -61,6 +61,12 @@ impl Editor {
     self.previous_command_keys.clear();
   }
 
+  fn clear_last_command_key(&mut self) {
+    // Remove last element in a vector
+    self.previous_command_keys.pop();
+    self.set_command_message();
+  }
+
   fn set_command_message(&mut self) {
     // iterate through previous_command_keys and build a string
     let mut message = String::new();
@@ -157,141 +163,16 @@ impl Editor {
         })
       },
       /* End Cursor Control */
-      /* Flow Control */
-      // KeyEvent {
-      //   code: KeyCode::Char(':'),
-      //   modifiers: event::KeyModifiers::NONE,
-      //   ..
-      // } => {
-      //   match self.mode {
-      //     EditorModes::Command => {
-      //       log::log::log("INFO".to_string(), "Beginning command.".to_string());
-      //       self.clear_previous_keys();
-      //       self.set_previous_key(KeyCode::Char(':'));
-      //       self.set_command_message();
-      //     },
-      //     EditorModes::Insert => {
-      //       self.output.insert_character(':');
-      //     },
-      //   }
-      // },
-      // KeyEvent {
-      //   code: KeyCode::Char('f'),
-      //   modifiers: event::KeyModifiers::NONE,
-      //   ..
-      // } => {
-      //   log::log::log("INFO".to_string(), "Activating find mode.".to_string());
-      //   if self.previous_command_keys.last() == Some(&KeyCode::Char(':')) {
-      //     self.set_previous_key(KeyCode::Char('f'));
-      //     self.output.find()?;
-      //   } else {
-      //     self.output.insert_character('f')
-      //   }
-      // }
-      // KeyEvent {
-      //   code: KeyCode::Char('w'),
-      //   modifiers: event::KeyModifiers::NONE,
-      //   ..
-      // } => {
-      //   log::log::log("INFO".to_string(), "Saving file.".to_string());
-      //   // TODO- Check that a filename has been provided, if not, prompt for one
-      //   if self.previous_command_keys.last() == Some(&KeyCode::Char(':')) {
-      //     if matches!(self.output.editor_rows.filename, None) {
-      //       let prompt = prompt!(&mut self.output, "Save as: {}")
-      //         .map(|it| it.into());
-
-      //       if prompt.is_none() {
-      //         self.output
-      //           .status_message
-      //           .set_message("Save aborted".into());
-      //         return Ok(true);
-      //       }
-      //       prompt
-      //         .as_ref()
-      //         .and_then(|path: &PathBuf| path.extension())
-      //         .and_then(|ext| ext.to_str())
-      //         .map(|ext| {
-      //           Output::select_syntax(ext).map(|syntax| {
-      //             let highlight = self.output.syntax_highlight.insert(syntax);
-      //             for i in 0..self.output.editor_rows.number_of_rows() {
-      //               highlight
-      //                 .update_syntax(i, &mut self.output.editor_rows.row_contents)
-      //             }
-      //           })
-      //         });
-      //       self.output.editor_rows.filename = prompt;
-      //     }
-      //     self.output.editor_rows.save()?;
-      //     self.output.status_message.set_message("File saved.".to_string());
-      //     self.output.dirty = false;
-      //   } else {
-      //     self.output.insert_character('w')
-      //   }
-      // },
-      // KeyEvent {
-      //   code: KeyCode::Char('q'),
-      //   modifiers: event::KeyModifiers::NONE,
-      //   ..
-      // } => {
-      //   log::log::log("INFO".to_string(), "Exiting editor.".to_string());
-      //   if self.previous_command_keys.last() == Some(&KeyCode::Char('w'))
-      //     && self.previous_command_keys.get(1) == Some(&KeyCode::Char(':')) {
-      //     // This is already saved so we can exit
-      //     return Ok(false);
-      //   } else if self.previous_command_keys.last() == Some(&KeyCode::Char(':')) {
-      //     if self.output.dirty {
-      //       log::log::log("INFO".to_string(), "File has unsaved changes.".to_string());
-      //       self.set_previous_key(KeyCode::Char('q'));
-      //       self.output.status_message.set_message("File has unsaved changes. Press :q! to exit without saving.".to_string())
-      //     } else {
-      //       return Ok(false);
-      //     }
-      //   } else {
-      //     self.output.insert_character('q')
-      //   }
-      // },
-      KeyEvent {
-        code: KeyCode::Char('!'),
-        modifiers: event::KeyModifiers::NONE,
-        ..
-      } => {
-        if self.previous_command_keys.last() == Some(&KeyCode::Char('q'))
-          && self.previous_command_keys.get(1) == Some(&KeyCode::Char(':')) {
-          log::log::log("INFO".to_string(), "Exiting without saving.".to_string());
-          return Ok(false);
-        } else {
-          self.output.insert_character('!')
-        }
-      }
-      /* End Flow Control */
       /* Text Control */
       KeyEvent {
-        code: KeyCode::Enter,
-        modifiers: event::KeyModifiers::NONE,
-        ..
-      } => self.output.insert_newline(),
-      KeyEvent {
-        code: key @ (KeyCode::Backspace | KeyCode::Delete),
-        modifiers: event::KeyModifiers::NONE,
-        ..
-      } => {
-        if matches!(key, KeyCode::Delete) {
-          self.output.move_cursor(KeyCode::Right)
-        }
-        self.output.delete_character()
-      },
-      KeyEvent {
-        code: KeyCode::Esc,
-        modifiers: event::KeyModifiers::NONE,
-        ..
-      } => {
-        if matches!(self.mode, EditorModes::Insert) {
-          // Only toggle with esc if we're in insert mode
-          self.toggle_mode();
-        }
-      },
-      KeyEvent {
-        code: code @ (KeyCode::Char(..) | KeyCode::Tab),
+        code: code @ (
+          KeyCode::Char(..) 
+          | KeyCode::Tab
+          | KeyCode::Backspace
+          | KeyCode::Delete
+          | KeyCode::Enter
+          | KeyCode::Esc
+        ),
         modifiers: event::KeyModifiers::NONE | event::KeyModifiers::SHIFT,
         ..
       } => {
@@ -314,6 +195,11 @@ impl Editor {
               => {
               self.set_previous_key(code);
             },
+            KeyCode::Backspace => {
+              // remove last value in previous_command_keys,
+              // Update status message
+              self.clear_last_command_key();
+            },
             KeyCode::Enter => {
               log::log::log("INFO".to_string(), "Activating find mode.".to_string());
               // Iterate through the previous keys and see if we have a command
@@ -327,7 +213,7 @@ impl Editor {
                 }).collect();
                 log::log::log("INFO".to_string(), format!("Command: :{}", command));
                 match command.as_str() {
-                  "w" => {
+                  ":w" => {
                     // Save the file
                     log::log::log("INFO".to_string(), "Saving file.".to_string());
                     match self.save() {
@@ -339,7 +225,7 @@ impl Editor {
                       }
                     }
                   }
-                  "q" => {
+                  ":q" => {
                     // Attempt to quit
                     log::log::log("INFO".to_string(), "Attempting to quit.".to_string());
                     if self.output.dirty {
@@ -351,24 +237,24 @@ impl Editor {
                       return Ok(false);
                     }
                   },
-                  "q!" => {
+                  ":q!" => {
                     // Force quit
                     log::log::log("INFO".to_string(), "Force quitting.".to_string());
                     return Ok(false);
                   },
-                  "wq" => {
+                  ":wq" => {
                     // Save then quit
                     log::log::log("INFO".to_string(), "Saving file and quitting.".to_string());
                     match self.save() {
                       Ok(_) => {
-                        return Ok(true)
+                        return Ok(false)
                       },
                       Err(_) => {
-                        return Ok(false)
+                        return Ok(true)
                       }
                     }
                   },
-                  "f" => {
+                  ":f" => {
                     // Find
                     log::log::log("INFO".to_string(), "Finding.".to_string());
                     match self.output.find() {
@@ -380,12 +266,12 @@ impl Editor {
                       }
                     }
                   },
-                  "d" => {
+                  ":d" => {
                     log::log::log("INFO".to_string(), "Deleting line.".to_string());
                     // self.output.delete_line();
                   },
                   _ => {
-                    log::log::log("INFO".to_string(), "Invalid command.".to_string());
+                    log::log::log("INFO".to_string(), format!("Invalid command: {:?}", command));
                     self.output.status_message.set_message("Invalid command.".to_string());
                   }
                 }
@@ -394,15 +280,37 @@ impl Editor {
               }
               
             },
-            _ => unreachable!(),
+            _ => {
+              self.clear_previous_keys();
+              self.output.status_message.set_message("Invalid command key.".to_string());
+            },
           }
         } else {
-          // Insert mode controls
-          self.output.insert_character(match code {
-            KeyCode::Char(ch) => ch,
-            KeyCode::Tab => '\t',
-            _ => unreachable!(),
-          })
+          match code {
+            KeyCode::Char(ch) => {
+              self.output.insert_character(ch);
+            },
+            KeyCode::Tab => {
+              self.output.insert_character('\t');
+            },
+            KeyCode::Backspace => {
+              self.output.delete_character();
+            },
+            KeyCode::Delete => {
+              self.output.move_cursor(KeyCode::Right);
+              self.output.delete_character();
+            },
+            KeyCode::Enter => {
+              self.output.insert_newline();
+            },
+            KeyCode::Esc => {
+              self.toggle_mode();
+            },
+            _ => {
+              log::log::log("INFO".to_string(), format!("Unsupported key: {:?}", code));
+              self.output.status_message.set_message("Unsupported key.".to_string());
+            },
+          }
         }
       },
       /* End Text Control */
