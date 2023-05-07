@@ -1,5 +1,7 @@
 use std::cmp;
 use crossterm::{queue, style};
+use colored::{Colorize, Color};
+
 use crate::syntax_struct;
 use super::editor::{Row, EditorContents};
 
@@ -13,6 +15,14 @@ pub enum HighlightType {
   Comment,
   MultilineComment,
   Other (style::Color),
+}
+
+pub enum FormatType {
+  Normal,
+  Strikethrough,
+  Underline,
+  Italic,
+  Bold,
 }
 
 pub trait SyntaxHighlight {
