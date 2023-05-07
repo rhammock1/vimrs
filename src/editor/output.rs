@@ -2,7 +2,6 @@ use std::{io, cmp};
 use std::io::Write;
 use crossterm::{cursor, event, execute, terminal, queue, style};
 use crossterm::event::{KeyCode, KeyEvent};
-use colored::Colorize;
 
 use crate::{
   log,
@@ -49,7 +48,7 @@ impl Output {
       editor_contents: EditorContents::new(),
       editor_rows: EditorRows::new(&mut syntax_highlight),
       cursor_controller: CursorController::new(window_size),
-      status_message: StatusMessage::new("HELP: :w = Save | :q = Quit | :f = Find".into()),
+      status_message: StatusMessage::new("[COMMAND]".into()), // Starting in Command mode
       dirty: false,
       search_index: SearchIndex::new(),
       syntax_highlight,

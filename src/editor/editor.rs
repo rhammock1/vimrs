@@ -85,8 +85,14 @@ impl Editor {
   fn toggle_mode(&mut self) {
     // This works well enough for only having two modes
     self.mode = match self.mode {
-      EditorModes::Command => EditorModes::Insert,
-      EditorModes::Insert => EditorModes::Command,
+      EditorModes::Command =>{
+        self.output.status_message.set_message("[INSERT]".to_string());
+        EditorModes::Insert
+      },
+      EditorModes::Insert => {
+        self.output.status_message.set_message("[COMMAND]".to_string());
+        EditorModes::Command
+      },
     }
   }
 
