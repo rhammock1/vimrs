@@ -237,6 +237,14 @@ impl Output {
     self.dirty = true;
   }
 
+  pub fn delete_line(&mut self) {
+    if self.cursor_controller.cursor_y == self.editor_rows.number_of_rows() {
+      return;
+    }
+    self.editor_rows.join_adjacent_rows(self.cursor_controller.cursor_y);
+    self.dirty = true;
+  }
+
   pub fn delete_character(&mut self) {
     if self.cursor_controller.cursor_y == self.editor_rows.number_of_rows() {
       return;

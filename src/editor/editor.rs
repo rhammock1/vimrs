@@ -128,6 +128,85 @@ impl Editor {
     Ok(true)
   }
 
+  fn process_command(&mut self) -> crossterm::Result<bool> {
+    let command: String = self.previous_command_keys.iter().map(|key| match key {
+      KeyCode::Char(ch) => ch,
+      _ => unreachable!(),
+    }).collect();
+    log::log::log("INFO".to_string(), format!("Command: {}", command));
+    match command.as_str() {
+      ":w" => {
+        // Save the file
+        log::log::log("INFO".to_string(), "Saving file.".to_string());
+        match self.save() {
+          Ok(_) => {
+            return Ok(true)
+          },
+          Err(_) => {
+            return Ok(false)
+          }
+        }
+      }
+      ":q" => {
+        // Attempt to quit
+        log::log::log("INFO".to_string(), "Attempting to quit.".to_string());
+        if self.output.dirty {
+          log::log::log("INFO".to_string(), "File has unsaved changes.".to_string());
+          self.output.status_message.set_message("File has unsaved changes. Press :q! to exit without saving.".to_string());
+          self.clear_previous_keys();
+          return Ok(true);
+        } else {
+          return Ok(false);
+        }
+      },
+      ":q!" => {
+        // Force quit
+        log::log::log("INFO".to_string(), "Force quitting.".to_string());
+        return Ok(false);
+      },
+      ":wq" => {
+        // Save then quit
+        log::log::log("INFO".to_string(), "Saving file and quitting.".to_string());
+        match self.save() {
+          Ok(_) => {
+            return Ok(false)
+          },
+          Err(_) => {
+            return Ok(true)
+          }
+        }
+      },
+      ":f" => {
+        // Find
+        log::log::log("INFO".to_string(), "Finding.".to_string());
+        match self.output.find() {
+          Ok(_) => {
+            return Ok(true)
+          },
+          Err(_) => {
+            return Ok(false)
+          }
+        }
+      },
+      ":o" => {
+        log::log::log("INFO".to_string(), "Opening new line.".to_string());
+        self.output.insert_newline();
+      },
+      ":d" => {
+        log::log::log("INFO".to_string(), "Deleting line.".to_string());
+        self.output.delete_line();
+      },
+      "" => {}, // do nothing if no command is entered
+      _ => {
+        log::log::log("INFO".to_string(), format!("Invalid command: {:?}", command));
+        self.output.status_message.set_message("Invalid command.".to_string());
+      }
+    }
+    self.clear_previous_keys();
+    self.set_command_message();
+    return Ok(true)
+  }
+
   pub fn process_keypress(&mut self) -> crossterm::Result<bool> {
     match self.reader.read()? {
       /* Cursor Control */
@@ -198,6 +277,7 @@ impl Editor {
               | KeyCode::Char('q') // Quit
               | KeyCode::Char('!') // Force Quit
               | KeyCode::Char('d') // Delete TODO- Implement
+              | KeyCode::Char('o') // New line TODO - Implement
               => {
               self.set_previous_key(code);
             },
@@ -207,84 +287,8 @@ impl Editor {
               self.clear_last_command_key();
             },
             KeyCode::Enter => {
-              log::log::log("INFO".to_string(), "Activating find mode.".to_string());
-              // Iterate through the previous keys and see if we have a command
-              // If we do, execute it
-              // check if the first element is a colon
-              if self.previous_command_keys.first() == Some(&KeyCode::Char(':')) {
-                // We need to match the whole command string could be more than 3 characters
-                let command: String = self.previous_command_keys.iter().map(|key| match key {
-                  KeyCode::Char(ch) => ch,
-                  _ => unreachable!(),
-                }).collect();
-                log::log::log("INFO".to_string(), format!("Command: :{}", command));
-                match command.as_str() {
-                  ":w" => {
-                    // Save the file
-                    log::log::log("INFO".to_string(), "Saving file.".to_string());
-                    match self.save() {
-                      Ok(_) => {
-                        return Ok(true)
-                      },
-                      Err(_) => {
-                        return Ok(false)
-                      }
-                    }
-                  }
-                  ":q" => {
-                    // Attempt to quit
-                    log::log::log("INFO".to_string(), "Attempting to quit.".to_string());
-                    if self.output.dirty {
-                      log::log::log("INFO".to_string(), "File has unsaved changes.".to_string());
-                      self.output.status_message.set_message("File has unsaved changes. Press :q! to exit without saving.".to_string());
-                      self.clear_previous_keys();
-                      return Ok(true);
-                    } else {
-                      return Ok(false);
-                    }
-                  },
-                  ":q!" => {
-                    // Force quit
-                    log::log::log("INFO".to_string(), "Force quitting.".to_string());
-                    return Ok(false);
-                  },
-                  ":wq" => {
-                    // Save then quit
-                    log::log::log("INFO".to_string(), "Saving file and quitting.".to_string());
-                    match self.save() {
-                      Ok(_) => {
-                        return Ok(false)
-                      },
-                      Err(_) => {
-                        return Ok(true)
-                      }
-                    }
-                  },
-                  ":f" => {
-                    // Find
-                    log::log::log("INFO".to_string(), "Finding.".to_string());
-                    match self.output.find() {
-                      Ok(_) => {
-                        return Ok(true)
-                      },
-                      Err(_) => {
-                        return Ok(false)
-                      }
-                    }
-                  },
-                  ":d" => {
-                    log::log::log("INFO".to_string(), "Deleting line.".to_string());
-                    // self.output.delete_line();
-                  },
-                  _ => {
-                    log::log::log("INFO".to_string(), format!("Invalid command: {:?}", command));
-                    self.output.status_message.set_message("Invalid command.".to_string());
-                  }
-                }
-              } else {
-                self.output.status_message.set_message("Invalid command.".to_string());
-              }
-              
+              log::log::log("INFO".to_string(), "Executing command".to_string());
+              return self.process_command()
             },
             _ => {
               self.clear_previous_keys();
