@@ -2,7 +2,7 @@ use std::cmp;
 use crossterm::{queue, style};
 // use colored::{Colorize, Color};
 
-use crate::{syntax_struct, log};
+use crate::syntax_struct;
 use super::editor::{Row, EditorContents};
 
 #[derive(Copy, Clone, Debug)]
@@ -42,7 +42,7 @@ pub trait SyntaxHighlight {
       }
       out.push(c);
     });
-    let _ = queue!(out, style::ResetColor);
+    let _ = queue!(out, style::SetForegroundColor(style::Color::Reset));
   }
   fn is_separator(&self, c: char) -> bool {
     c.is_whitespace() || [
@@ -228,7 +228,6 @@ macro_rules! syntax_struct {
               )*
             )*
           }
-          log::log::log("INFO".to_string(), format!("{} {:?}", c, previous_highlight));
           add!(HighlightType::Normal);
           previous_separater = self.is_separator(c);
           i += 1;
@@ -264,13 +263,13 @@ syntax_struct! {
     },
     multiline_comment: Some(("/*", "*/")),
     colors: {
-      &HighlightType::Normal => style::Color::Reset,
-      &HighlightType::Number => style::Color::Cyan,
-      &HighlightType::SearchMatch => style::Color::Blue,
-      &HighlightType::DoubleQuoteString => style::Color::Green,
-      &HighlightType::SingleQuoteString => style::Color::Yellow,
-      &HighlightType::Comment => style::Color::DarkGrey,
-      &HighlightType::MultilineComment => style::Color::DarkGrey
+      HighlightType::Normal => style::Color::Reset,
+      HighlightType::Number => style::Color::Cyan,
+      HighlightType::SearchMatch => style::Color::Blue,
+      HighlightType::DoubleQuoteString => style::Color::Green,
+      HighlightType::SingleQuoteString => style::Color::Yellow,
+      HighlightType::Comment => style::Color::DarkGrey,
+      HighlightType::MultilineComment => style::Color::DarkGrey
     }
   }
 }
@@ -283,7 +282,7 @@ syntax_struct! {
     keywords: {},
     multiline_comment: None::<(&'static str, &'static str)>,
     colors: {
-      HighlightType::Normal => style::Color::White,
+      HighlightType::Normal => style::Color::Reset,
       HighlightType::Number => style::Color::Cyan,
       HighlightType::SearchMatch => style::Color::Blue,
       HighlightType::DoubleQuoteString => style::Color::Red,
