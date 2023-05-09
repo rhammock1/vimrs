@@ -1,4 +1,11 @@
-use std::{cmp, io, env, fs, path::PathBuf, time::{Duration, Instant}};
+use std::{
+  cmp,
+  io,
+  env,
+  fs,
+  path::PathBuf,
+  time::{Duration, Instant},
+};
 use std::io::Write;
 use crossterm::{event, terminal, queue};
 use crossterm::event::{KeyCode, KeyEvent};
@@ -196,6 +203,10 @@ impl Editor {
         log::log::log("INFO".to_string(), "Deleting line.".to_string());
         self.output.delete_line();
       },
+      // ":u" => {
+      //   log::log::log("INFO".to_string(), "Undoing last action.".to_string());
+      //   self.output.undo();
+      // }
       "" => {}, // do nothing if no command is entered
       _ => {
         log::log::log("INFO".to_string(), format!("Invalid command: {:?}", command));
@@ -275,9 +286,10 @@ impl Editor {
             KeyCode::Char('f') // Find
               | KeyCode::Char('w') // Write
               | KeyCode::Char('q') // Quit
-              | KeyCode::Char('!') // Force Quit
-              | KeyCode::Char('d') // Delete TODO- Implement
-              | KeyCode::Char('o') // New line TODO - Implement
+              | KeyCode::Char('!') // Force
+              | KeyCode::Char('d') // Delete
+              | KeyCode::Char('o') // New line
+              // | KeyCode::Char('u') // Undo
               => {
               self.set_previous_key(code);
             },

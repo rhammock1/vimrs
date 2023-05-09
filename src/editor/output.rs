@@ -153,6 +153,16 @@ impl Output {
     }
   }
 
+  // pub fn undo(&mut self) {
+  //   self.;
+  //   self.cursor_controller.cursor_x = self
+  //     .editor_rows
+  //     .get_editor_row(self.cursor_controller.cursor_y)
+  //     .render
+  //     .len();
+  //   self.dirty = true;
+  // }
+
   pub fn find(&mut self) -> io::Result<()> {
     let cursor_controller = self.cursor_controller;
     if prompt!(
