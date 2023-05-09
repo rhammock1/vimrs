@@ -16,13 +16,16 @@ use super::{
     EditorRows,
     StatusMessage,
   },
+  highlight::{
+    HighlightType,
+    SyntaxHighlight,
+  },
   syntax::{
     RustHighlight,
     PlainTextHighlight,
     JavaScriptHighlight,
-    HighlightType,
-    SyntaxHighlight,
-  },
+    ShellScriptHighlight,
+  }
 };
 
 pub struct Output {
@@ -59,7 +62,8 @@ impl Output {
     let list: Vec<Box<dyn SyntaxHighlight>> = vec![
       Box::new(RustHighlight::new()),
       Box::new(PlainTextHighlight::new()),
-      Box::new(JavaScriptHighlight::new())
+      Box::new(JavaScriptHighlight::new()),
+      Box::new(ShellScriptHighlight::new()),
     ];
     list.into_iter()
       .find(|it| it.extensions().contains(&extension))

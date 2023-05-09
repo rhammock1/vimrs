@@ -6,6 +6,7 @@ pub mod editor {
   pub mod output;
   pub mod cursor;
   pub mod editor;
+  pub mod highlight;
   pub mod syntax;
 }
 mod log;

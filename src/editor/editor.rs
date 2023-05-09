@@ -18,7 +18,7 @@ use crate::{
   CONFIG,
 };
 use super::{
-  syntax::{
+  highlight::{
     SyntaxHighlight,
     HighlightType
   }, 
