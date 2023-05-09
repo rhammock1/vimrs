@@ -1,8 +1,8 @@
 use std::cmp;
 use crossterm::{queue, style};
-use colored::{Colorize, Color};
+// use colored::{Colorize, Color};
 
-use crate::syntax_struct;
+use crate::{syntax_struct, log};
 use super::editor::{Row, EditorContents};
 
 #[derive(Copy, Clone, Debug)]
@@ -10,8 +10,8 @@ pub enum HighlightType {
   Normal,
   Number,
   SearchMatch,
-  String,
-  CharLiteral,
+  DoubleQuoteString,
+  SingleQuoteString,
   Comment,
   MultilineComment,
   Other (style::Color),
@@ -177,11 +177,11 @@ macro_rules! syntax_struct {
 
           if let Some(val) = in_string {
             add! {
-              if val == '"' { HighlightType::String } else { HighlightType::CharLiteral }
+              if val == '"' { HighlightType::DoubleQuoteString } else { HighlightType::SingleQuoteString }
             }
             if c == '\\' && i + 1 < render.len() {
               add! {
-                if val == '"' { HighlightType::String } else { HighlightType::CharLiteral }
+                if val == '"' { HighlightType::DoubleQuoteString } else { HighlightType::SingleQuoteString }
               }
               i += 2;
               continue;
@@ -192,10 +192,11 @@ macro_rules! syntax_struct {
             i += 1;
             previous_separater = true;
             continue;
-          } else if c == '"' || c == '\'' {
+            // We are in a string if the current character is a quote, there is another quote somewhere in the line, and the previous character is a separator
+          } else if (c == '"' || c == '\'') && render[i + 1..].contains(&(c as u8)) && previous_separater {
             in_string = Some(c);
             add! {
-              if c == '"' { HighlightType::String } else { HighlightType::CharLiteral }
+              if c == '"' { HighlightType::DoubleQuoteString } else { HighlightType::SingleQuoteString }
             }
             i += 1;
             continue;
@@ -227,6 +228,7 @@ macro_rules! syntax_struct {
               )*
             )*
           }
+          log::log::log("INFO".to_string(), format!("{} {:?}", c, previous_highlight));
           add!(HighlightType::Normal);
           previous_separater = self.is_separator(c);
           i += 1;
@@ -265,8 +267,8 @@ syntax_struct! {
       &HighlightType::Normal => style::Color::Reset,
       &HighlightType::Number => style::Color::Cyan,
       &HighlightType::SearchMatch => style::Color::Blue,
-      &HighlightType::String => style::Color::Green,
-      &HighlightType::CharLiteral => style::Color::Yellow,
+      &HighlightType::DoubleQuoteString => style::Color::Green,
+      &HighlightType::SingleQuoteString => style::Color::Yellow,
       &HighlightType::Comment => style::Color::DarkGrey,
       &HighlightType::MultilineComment => style::Color::DarkGrey
     }
@@ -281,11 +283,11 @@ syntax_struct! {
     keywords: {},
     multiline_comment: None::<(&'static str, &'static str)>,
     colors: {
-      HighlightType::Normal => style::Color::Reset,
+      HighlightType::Normal => style::Color::White,
       HighlightType::Number => style::Color::Cyan,
       HighlightType::SearchMatch => style::Color::Blue,
-      HighlightType::String => style::Color::Red,
-      HighlightType::CharLiteral => style::Color::Yellow,
+      HighlightType::DoubleQuoteString => style::Color::Red,
+      HighlightType::SingleQuoteString => style::Color::Yellow,
       HighlightType::Comment => style::Color::DarkGrey,
       HighlightType::MultilineComment => style::Color::DarkGrey
     }
@@ -317,8 +319,8 @@ syntax_struct! {
       HighlightType::Normal => style::Color::Reset,
       HighlightType::Number => style::Color::Cyan,
       HighlightType::SearchMatch => style::Color::Blue,
-      HighlightType::String => style::Color::Red,
-      HighlightType::CharLiteral => style::Color::Yellow,
+      HighlightType::DoubleQuoteString => style::Color::Red,
+      HighlightType::SingleQuoteString => style::Color::Yellow,
       HighlightType::Comment => style::Color::DarkGrey,
       HighlightType::MultilineComment => style::Color::DarkGrey
     }
