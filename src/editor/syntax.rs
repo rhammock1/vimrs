@@ -108,8 +108,8 @@ syntax_struct! {
       HighlightType::Normal => style::Color::Reset,
       HighlightType::Number => style::Color::Cyan,
       HighlightType::SearchMatch => style::Color::Blue,
-      HighlightType::DoubleQuoteString => style::Color::Red,
-      HighlightType::SingleQuoteString => style::Color::Yellow,
+      HighlightType::DoubleQuoteString => style::Color::Magenta,
+      HighlightType::SingleQuoteString => style::Color::DarkYellow,
       HighlightType::Comment => style::Color::DarkGrey,
       HighlightType::MultilineComment => style::Color::DarkGrey
     }
