@@ -24,7 +24,7 @@ pub struct Config {
 }
 
 pub const CONFIG: Config = Config {
-  version: 0.50,
+  version: 1.00,
   poll_timeout: time::Duration::from_millis(1500),
   spaces_per_tab: 2,
   message_timeout: 5,
